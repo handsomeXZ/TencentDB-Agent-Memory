@@ -1,0 +1,9 @@
+Task 11 OpenCode server import smoke
+
+Command:
+node -e "const mod = await import('./dist/opencode/server.js'); if (!mod.default || typeof mod.default.server !== 'function') throw new Error('missing default server export'); console.log('server import ok; default.server is function');"
+
+Sanitized output:
+server import ok; default.server is function
+
+Result: exit code 0. Built dist/opencode/server.js imports without requiring a running Gateway.

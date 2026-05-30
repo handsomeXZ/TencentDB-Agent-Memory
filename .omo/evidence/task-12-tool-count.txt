@@ -1,0 +1,11 @@
+Task 12 tool count guardrail
+
+Command: rg -n "tdai_memory_(seed|delete|update|debug|admin|stats|reset)|tdai_conversation_(seed|delete|update|debug|admin|stats|reset)|tdai_memory_recall|tdai_memory_search|tdai_conversation_search" src/adapters/opencode
+
+Sanitized result:
+- `src/adapters/opencode/tools.ts` declares exactly three runtime tool names:
+  - tdai_memory_recall
+  - tdai_memory_search
+  - tdai_conversation_search
+- `src/adapters/opencode/tools.ts` `getOpenCodeV1ToolNames()` returns the same exact three names.
+- No admin/debug/seed/delete/update/stats/reset v1 tool registrations were found in adapter source; extra matches are negative assertions inside `src/adapters/opencode/tools.test.ts` and a fake single-tool registration inside `src/adapters/opencode/host-adapter.test.ts`.

@@ -1,0 +1,9 @@
+Task 11 missing API key fast-fail smoke
+
+Command:
+node -e "const mod = await import('./dist/opencode/server.js'); let calls = 0; const plugin = mod.createOpenCodeServerPlugin({ env: {}, fetch: async () => { calls++; throw new Error('unexpected protected call'); } }); try { await plugin.server({ directory: 'D:/workspace' }, {}); throw new Error('expected missing key failure'); } catch (error) { if (!String(error.message).includes('apiKey is required')) throw error; if (calls !== 0) throw new Error('Gateway call count was ' + calls); console.log('missing apiKey failed before Gateway calls; calls=' + calls); }"
+
+Sanitized output:
+missing apiKey failed before Gateway calls; calls=0
+
+Result: exit code 0. Initialization fails before any Gateway request when apiKey is missing.

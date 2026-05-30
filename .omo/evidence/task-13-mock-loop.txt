@@ -1,0 +1,9 @@
+Task 13 mock loop evidence (sanitized)
+
+- Targeted lifecycle test: `npm test -- src/adapters/opencode/lifecycle.test.ts` passed with 1 file and 7 tests.
+- Targeted recall lifecycle test: `npm test -- src/adapters/opencode/recall-lifecycle.test.ts` passed with 1 file and 6 tests.
+- Targeted server lifecycle wiring test: `npm test -- src/opencode/server.test.ts` passed with 1 file and 12 tests.
+- Mock server loop covered final assistant turn capture followed by explicit `tdai_memory_recall`; assertions confirmed `/capture` and `/recall` used the same scoped hashed OpenCode `session_key` and no raw secret values were recorded.
+- Full regression: `npm test` passed with 8 files and 64 tests.
+- Build regression: `npm run build` passed; local Node `v22.17.0` emitted the known non-blocking tsdown deprecation warning recommending Node `v22.18.0` or later.
+- Built-server manual QA: a mocked `dist/opencode/server.js` loop sent one final capture, one explicit recall, and one dispose session-end; observed sanitized summary `{"capture":1,"recall":1,"end":1,"output":"ok"}`.

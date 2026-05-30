@@ -1,0 +1,7 @@
+Task 13 stream dedupe evidence (sanitized)
+
+- Targeted server test `deduplicates streaming chunks and duplicate final events at the server event hook` passed under `npm test -- src/opencode/server.test.ts`.
+- The fake event loop sent one streaming `assistant.delta` chunk, one final assistant event, and a duplicate final event.
+- Assertions observed exactly one `/capture` request, with final assistant content only and no partial chunk text in the request body.
+- Full regression: `npm test` passed with 8 files and 64 tests.
+- Build regression: `npm run build` passed; local Node `v22.17.0` emitted the known non-blocking tsdown deprecation warning recommending Node `v22.18.0` or later.

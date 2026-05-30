@@ -1,0 +1,28 @@
+Task 12 verification evidence
+
+Command: npm run test -- src/adapters/opencode/tools.test.ts
+Result: PASS
+
+Summary:
+- Test Files: 1 passed (1)
+- Tests: 16 passed (16)
+- Scope: src/adapters/opencode/tools.test.ts
+
+Sanitized notes:
+- Covers exact v1 tool names only: tdai_memory_recall, tdai_memory_search, tdai_conversation_search.
+- Covers degraded Gateway errors with redacted Authorization bearer text and API-key-like values.
+
+Command: npm test
+Result: PASS
+
+Summary:
+- Test Files: 5 passed (5)
+- Tests: 39 passed (39)
+
+Command: npm run build
+Result: PASS
+
+Summary:
+- build:plugin passed
+- build:scripts passed
+- Warning observed: tsdown reports Node.js v22.17.0 is deprecated and recommends v22.18.0 or later.

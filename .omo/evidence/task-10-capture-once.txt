@@ -1,0 +1,39 @@
+Task 10 OpenCode capture-once lifecycle evidence
+
+Commands:
+  npm test -- src/adapters/opencode/lifecycle.test.ts
+  npm test
+  npm run build
+  npx tsx -e "<sanitized fake lifecycle driver>"
+
+Sanitized targeted Vitest result:
+  RUN v4.1.7 D:/ForkWorkSpace/TencentDB-Agent-Memory
+  Test Files: 1 passed (1)
+  Tests: 6 passed (6)
+  Duration: 204ms
+
+Sanitized full test result:
+  RUN v4.1.7 D:/ForkWorkSpace/TencentDB-Agent-Memory
+  Test Files: 8 passed (8)
+  Tests: 59 passed (59)
+  Duration: 536ms
+
+Sanitized build result:
+  npm run build exited successfully.
+  tsdown emitted the known local Node v22.17.0 deprecation warning only.
+
+Manual fake-driver result:
+  captureCalls: 1
+  endSessionCalls: 1
+  captureHasRawSecret: false
+  warningCount: 1
+  warningHasRawSecret: false
+  sessionKeyPattern: true
+
+Contract covered:
+  - Fake final user/assistant turn produced exactly one /capture DTO.
+  - Replayed final event did not duplicate capture.
+  - Streaming chunks were ignored; only final assistant content was captured.
+  - Capture content used Task 5 policy helpers for minimization and redaction.
+  - The scoped session_key matched the opencode hash format and did not expose raw workspace/project paths.
+  - No real Gateway, Docker, API key, Bearer token, system prompt, shell environment, binary content, or full tool output was used or printed.

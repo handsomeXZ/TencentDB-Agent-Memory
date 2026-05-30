@@ -1,0 +1,25 @@
+Task 10 OpenCode session-end warning evidence
+
+Commands:
+  npm test -- src/adapters/opencode/lifecycle.test.ts
+  npx tsx -e "<sanitized fake lifecycle driver>"
+
+Sanitized targeted Vitest result:
+  RUN v4.1.7 D:/ForkWorkSpace/TencentDB-Agent-Memory
+  Test Files: 1 passed (1)
+  Tests: 6 passed (6)
+  Duration: 204ms
+
+Manual fake-driver result:
+  captureCalls: 1
+  endSessionCalls: 1
+  warningCount: 1
+  warningHasRawSecret: false
+  processExit: success
+
+Contract covered:
+  - Session end produced exactly one /session/end DTO per scoped session key.
+  - Replayed session-end event did not duplicate the request.
+  - Simulated /session/end failure resolved without throwing.
+  - Warning text included degraded status and HTTP context while redacting Bearer material.
+  - No real Gateway, Docker, API key, Bearer token, system prompt, shell environment, binary content, or full tool output was used or printed.
