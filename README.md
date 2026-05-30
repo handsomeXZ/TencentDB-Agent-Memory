@@ -193,7 +193,25 @@ bash scripts/openclaw-after-tool-call-messages.patch.sh
 > 💡 The patch only needs to be applied once per OpenClaw installation. After upgrading OpenClaw, re-run the script to re-apply.
 
 
-### 2. Hermes (Docker, requires version ≥ 0.3.4)
+### 2. OpenCode
+
+TencentDB Agent Memory also ships an OpenCode server plugin through the npm package. OpenCode v1 connects to an already running Gateway, it does not start or manage the Gateway for you. The default Gateway URL is `http://127.0.0.1:8420`.
+
+Quick start:
+
+1. Start a Gateway first, then confirm `GET /health` is reachable on `http://127.0.0.1:8420`.
+2. If the Gateway protects routes with `TDAI_GATEWAY_API_KEY`, configure the OpenCode plugin with the same secret through `apiKey` or the `TDAI_GATEWAY_API_KEY` environment variable.
+3. Load the npm plugin in `opencode.json` and point it at the running Gateway.
+4. Use the explicit tools `tdai_memory_recall`, `tdai_memory_search`, and `tdai_conversation_search` to verify memory access.
+
+Current OpenCode v1 boundary:
+
+- No short-term context offload or compression in OpenCode v1.
+- No automatic pre-model recall injection guarantee, explicit tools are the reliable entry point today.
+
+See the detailed guide in [`docs/opencode-memory-plugin.md`](./docs/opencode-memory-plugin.md) and the pinned compatibility notes in [`docs/opencode-plugin-compatibility.md`](./docs/opencode-plugin-compatibility.md).
+
+### 3. Hermes (Docker, requires version ≥ 0.3.4)
 
 In addition to OpenClaw, this plugin also supports [Hermes](https://github.com/NousResearch/hermes-agent) Agent. You can launch a memory-enabled Hermes with a single command:
 
@@ -247,9 +265,18 @@ docker exec -it hermes-memory hermes
 ---
 
 
+### 4. Standalone Gateway + Memory Visualizer
+
+If you want a standalone local service, the compose setup in [`docker/standalone/README.md`](./docker/standalone/README.md) starts both the Gateway and the read-only Memory Visualizer:
+
+- Gateway on `http://127.0.0.1:8420`
+- Memory Visualizer on `http://127.0.0.1:8421`
+
+The visualizer mounts the same memory data read-only, serves a local dashboard plus read-only `/api/*` endpoints, and is meant for white-box inspection rather than operating the memory system. See [`apps/memory-visualizer/README.md`](./apps/memory-visualizer/README.md) for its local-only, read-only boundary and data source details.
+
 ## 🔒 Gateway Security (optional)
 
-The Hermes Gateway listens on `:8420` and exposes capture / search / recall HTTP endpoints. Two opt-in switches let you turn it from "open localhost sidecar" into "authenticated network service". **Both default to off so existing deployments keep working unchanged.**
+The Gateway listens on `:8420` and exposes capture / search / recall HTTP endpoints. Two opt-in switches let you turn it from "open localhost sidecar" into "authenticated network service". **Both default to off so existing deployments keep working unchanged.**
 
 | Field | env | Default | Description |
 | :--- | :--- | :--- | :--- |
@@ -282,6 +309,10 @@ The plugin will then attach `Authorization: Bearer <key>` to every request it se
 Important: the plugin only handles the **client half**. Whether the Gateway actually enforces a Bearer check is decided on the Gateway side (`TDAI_GATEWAY_API_KEY` / `server.apiKey`). Configure the same secret on both ends — the plugin does not propagate the secret across, since the Gateway might be started by Docker, systemd, or any other means outside the plugin's control.
 
 If `MEMORY_TENCENTDB_GATEWAY_API_KEY` is unset, the plugin also looks at `TDAI_GATEWAY_API_KEY` as a fallback — handy when both processes share an env file and the operator only wants to set one variable name. The Gateway never reads `MEMORY_TENCENTDB_GATEWAY_API_KEY`; that name is plugin-side only.
+
+### OpenCode plugin side
+
+The OpenCode server plugin is also a **client** of the Gateway. When Gateway auth is enabled, pass the same secret through the plugin `apiKey` option in `opencode.json`, or set `TDAI_GATEWAY_API_KEY` before starting OpenCode. The OpenCode plugin does not start or configure the Gateway; it only attaches the Bearer token to protected Gateway calls.
 
 ---
 
@@ -387,10 +418,12 @@ Debugging no longer means probing an opaque database — it becomes a determinis
 | Capability | Description |
 | :--- | :--- |
 | OpenClaw plugin | Automatically captures, extracts, and recalls memory once installed |
+| OpenCode server plugin | npm-delivered Gateway client for OpenCode v1, defaulting to `http://127.0.0.1:8420` and using the same `TDAI_GATEWAY_API_KEY` or `apiKey` for protected routes |
 | Hermes Gateway adapter | `TdaiCore + HostAdapter`, decoupled from the host framework |
+| Memory Visualizer | Read-only local dashboard and read-only `/api/*` inspection service, available at `http://127.0.0.1:8421` in standalone compose |
 | Local backend | `SQLite + sqlite-vec`, ready to use out of the box |
 | Hybrid retrieval | BM25 + vector + RRF — supports both keyword and semantic recall |
-| Agent tools | `tdai_memory_search` / `tdai_conversation_search` |
+| Agent tools | `tdai_memory_recall` / `tdai_memory_search` / `tdai_conversation_search` |
 
 ---
 
@@ -398,6 +431,10 @@ Debugging no longer means probing an opaque database — it becomes a determinis
 
 | Document | Contents |
 | :--- | :--- |
+| [`docs/opencode-memory-plugin.md`](./docs/opencode-memory-plugin.md) | OpenCode plugin setup, tool surface, auth requirements, and current runtime boundary |
+| [`docs/opencode-plugin-compatibility.md`](./docs/opencode-plugin-compatibility.md) | Pinned OpenCode plugin compatibility contract |
+| [`docker/standalone/README.md`](./docker/standalone/README.md) | Standalone Gateway plus Memory Visualizer compose setup on ports `8420` and `8421` |
+| [`apps/memory-visualizer/README.md`](./apps/memory-visualizer/README.md) | Memory Visualizer read-only scope, runtime defaults, and local inspection notes |
 | [`scripts/README.memory-tencentdb-ctl.md`](./scripts/README.memory-tencentdb-ctl.md) | Operations & management tooling |
 | [`CHANGELOG.md`](./CHANGELOG.md) | Release notes and version history |
 | [`openclaw.plugin.json`](./openclaw.plugin.json) | OpenClaw plugin manifest and configuration schema |
@@ -420,10 +457,11 @@ We welcome every kind of contribution — bug reports, feature ideas, doc fixes,
 - [x] Long-term personalized memory (L0 → L3)
 - [x] Short-term context compression (Context Offload + Mermaid canvas)
 - [x] Local SQLite backend and Tencent Cloud Vector Database (TCVDB) backend
-- [x] OpenClaw plugin and Hermes Gateway integration
+- [x] OpenClaw plugin, OpenCode integration, and Hermes Gateway integration
+- [x] Read-only Memory Visualizer and standalone Gateway compose service
 - [ ] Portable memory: cross-Agent / cross-framework / cross-device import, export, and live migration
 - [ ] Automatic Skill generation
-- [ ] Visual debugging and memory observability dashboard
+- [ ] Deeper visual debugging and memory observability workflows
 
 ---
 

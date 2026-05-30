@@ -197,7 +197,25 @@ bash scripts/openclaw-after-tool-call-messages.patch.sh
 > 💡 patch 每次 OpenClaw 安装只需执行一次。升级 OpenClaw 后建议重新执行以确保钩子生效。
 
 
-### 2. Hermes（Docker，需版本号 ≥ 0.3.4）
+### 2. OpenCode
+
+TencentDB Agent Memory 现已通过 npm 包提供 OpenCode server 插件。当前 OpenCode v1 是一个连接独立 Gateway 的客户端，不会替你启动或管理 Gateway。默认连接地址是 `http://127.0.0.1:8420`。
+
+快速接入可以按下面 4 步走：
+
+1. 先启动 Gateway，并确认 `http://127.0.0.1:8420` 上的 `GET /health` 可访问。
+2. 如果 Gateway 为受保护路由启用了 `TDAI_GATEWAY_API_KEY`，OpenCode 插件侧也要通过 `apiKey` 或环境变量 `TDAI_GATEWAY_API_KEY` 配置同一个密钥。
+3. 在 `opencode.json` 里加载 npm 插件，并把 `gatewayUrl` 指向正在运行的 Gateway。
+4. 用显式工具 `tdai_memory_recall`、`tdai_memory_search`、`tdai_conversation_search` 验证记忆能力。
+
+当前 OpenCode v1 的边界：
+
+- 暂不支持短期上下文卸载或压缩。
+- 暂不承诺自动 pre-model recall injection，当前可靠入口仍然是显式工具。
+
+详细接入说明见 [`docs/opencode-memory-plugin.md`](./docs/opencode-memory-plugin.md)，兼容性边界见 [`docs/opencode-plugin-compatibility.md`](./docs/opencode-plugin-compatibility.md)。
+
+### 3. Hermes（Docker，需版本号 ≥ 0.3.4）
 
 除 OpenClaw 外，本插件同样支持 [Hermes](https://github.com/NousResearch/hermes-agent) Agent。通过一条命令即可启动一个带记忆能力的 Hermes：
 
@@ -251,9 +269,18 @@ docker exec -it hermes-memory hermes
 
 ---
 
+### 4. 独立 Gateway + Memory Visualizer
+
+如果你希望直接启动一个独立本地服务，可以使用 [`docker/standalone/README.md`](./docker/standalone/README.md) 里的 compose 方案，它会同时启动 Gateway 和只读 Memory Visualizer：
+
+- Gateway 运行在 `http://127.0.0.1:8420`
+- Memory Visualizer 运行在 `http://127.0.0.1:8421`
+
+Visualizer 会以只读方式挂载同一份 memory 数据，提供本地 dashboard 与只读 `/api/*` 接口，适合做白盒检查，不负责操作记忆系统。更多本地只读边界与数据源说明见 [`apps/memory-visualizer/README.md`](./apps/memory-visualizer/README.md)。
+
 ## 🔒 Gateway 安全配置（可选）
 
-Hermes Gateway 监听 `:8420`，对外提供 capture / search / recall 的 HTTP 接口。新增两个开关，可以把它从“开放的本地 sidecar”切换为“需要鉴权的网络服务”。**两个开关默认都关闭，已有部署的行为不变。**
+Gateway 监听 `:8420`，对外提供 capture / search / recall 的 HTTP 接口。新增两个开关，可以把它从“开放的本地 sidecar”切换为“需要鉴权的网络服务”。**两个开关默认都关闭，已有部署的行为不变。**
 
 | 字段 | env | 默认值 | 说明 |
 | :--- | :--- | :--- | :--- |
@@ -286,6 +313,10 @@ export MEMORY_TENCENTDB_GATEWAY_API_KEY="<与 Gateway 同一份密钥>"
 需要明确的边界：**插件只负责 client 一侧**。Gateway 是否真的强制鉴权由 Gateway 端自己的 `TDAI_GATEWAY_API_KEY` / `server.apiKey` 决定。两端要使用相同的密钥才能匹配；插件不会把这个值传递给 Gateway——因为 Gateway 可能由 Docker、systemd 或其它独立机制拉起，插件没有也不应该去管这个。
 
 若 `MEMORY_TENCENTDB_GATEWAY_API_KEY` 没设置，插件还会回退读取 `TDAI_GATEWAY_API_KEY`，方便两个进程共享同一个 env 文件、只设一个变量名的场景。Gateway 永远不会读 `MEMORY_TENCENTDB_GATEWAY_API_KEY`，那是插件侧专用名字。
+
+### OpenCode 插件侧的配置
+
+OpenCode server 插件同样是 Gateway 的**客户端**。当 Gateway 开启鉴权后，可以在 `opencode.json` 的插件 `apiKey` 选项中传入同一个密钥，或在启动 OpenCode 前设置 `TDAI_GATEWAY_API_KEY`。OpenCode 插件不会启动或配置 Gateway，只会在调用受保护 Gateway 接口时附带 Bearer token。
 
 ---
 
@@ -390,10 +421,12 @@ export MEMORY_TENCENTDB_GATEWAY_API_KEY="<与 Gateway 同一份密钥>"
 | 能力 | 说明 |
 | :--- | :--- |
 | OpenClaw 插件 | 安装后即可自动捕获、提取、召回记忆 |
+| OpenCode server 插件 | 通过 npm 交付的 OpenCode v1 Gateway 客户端，默认连接 `http://127.0.0.1:8420`，受保护路由使用同一个 `TDAI_GATEWAY_API_KEY` 或 `apiKey` |
 | Hermes Gateway 适配 | `TdaiCore + HostAdapter` 解耦宿主框架 |
+| Memory Visualizer | 独立 compose 中提供只读本地 dashboard 与只读 `/api/*` 检查服务，默认地址 `http://127.0.0.1:8421` |
 | 本地后端 | `SQLite + sqlite-vec`，开箱即用 |
 | 混合检索 | BM25 + 向量 + RRF，兼顾关键词和语义召回 |
-| Agent 工具 | `tdai_memory_search` / `tdai_conversation_search` |
+| Agent 工具 | `tdai_memory_recall` / `tdai_memory_search` / `tdai_conversation_search` |
 
 ---
 
@@ -401,6 +434,10 @@ export MEMORY_TENCENTDB_GATEWAY_API_KEY="<与 Gateway 同一份密钥>"
 
 | 文档 | 内容 |
 | :--- | :--- |
+| [`docs/opencode-memory-plugin.md`](./docs/opencode-memory-plugin.md) | OpenCode 插件接入、工具范围、鉴权要求与当前运行边界 |
+| [`docs/opencode-plugin-compatibility.md`](./docs/opencode-plugin-compatibility.md) | OpenCode 插件兼容性约束说明 |
+| [`docker/standalone/README.md`](./docker/standalone/README.md) | 独立 Gateway 与 Memory Visualizer 的 compose 启动说明，默认端口为 `8420` 和 `8421` |
+| [`apps/memory-visualizer/README.md`](./apps/memory-visualizer/README.md) | Memory Visualizer 的只读范围、运行默认值与本地检查说明 |
 | [`scripts/README.memory-tencentdb-ctl.md`](./scripts/README.memory-tencentdb-ctl.md) | 运维管理工具说明 |
 | [`CHANGELOG.md`](./CHANGELOG.md) | 版本变更记录 |
 | [`openclaw.plugin.json`](./openclaw.plugin.json) | OpenClaw 插件声明与配置 Schema |
@@ -424,10 +461,11 @@ export MEMORY_TENCENTDB_GATEWAY_API_KEY="<与 Gateway 同一份密钥>"
 - [x] 长期个性化记忆（L0 → L3）
 - [x] 短期记忆压缩（Context Offload + Mermaid 画布）
 - [x] 可用本地 SQLite 后端与腾讯云向量数据库 TCVDB 后端
-- [x] OpenClaw 插件与 Hermes Gateway 适配
+- [x] OpenClaw 插件、OpenCode 集成与 Hermes Gateway 适配
+- [x] 只读 Memory Visualizer 与独立 Gateway compose 服务
 - [ ] 记忆可迁移：跨 Agent / 跨框架 / 跨设备的导入导出与热迁移
 - [ ] Skill自动生成
-- [ ] 可视化调试与记忆观测面板
+- [ ] 更深入的可视化调试与记忆观测工作流
 
 ---
 
