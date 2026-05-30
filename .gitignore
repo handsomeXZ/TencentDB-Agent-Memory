@@ -6,6 +6,11 @@ workspace/
 
 # Environment variables
 .env
+.env.local
+docker/standalone/.env.local
+
+# Agent runtime continuation state
+.omo/run-continuation/
 
 # Test caches
 __tests__/soak/.model-cache/
