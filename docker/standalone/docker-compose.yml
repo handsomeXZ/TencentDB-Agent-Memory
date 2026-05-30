@@ -1,0 +1,30 @@
+services:
+  tdai-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: tdai-memory-gateway:1.0.0-beta.1
+    container_name: tdai-memory-gateway
+    restart: unless-stopped
+    env_file:
+      - .env.local
+    environment:
+      TDAI_GATEWAY_CONFIG: /config/tdai-gateway.standalone.yaml
+      TDAI_DATA_DIR: /data/memory-tdai
+      TDAI_GATEWAY_HOST: 0.0.0.0
+      TDAI_GATEWAY_PORT: "8420"
+      TDAI_DEPLOY_MODE: standalone
+    ports:
+      - "127.0.0.1:8420:8420"
+    volumes:
+      - tdai_memory_data:/data/memory-tdai
+      - ./tdai-gateway.standalone.yaml:/config/tdai-gateway.standalone.yaml:ro
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8420/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+volumes:
+  tdai_memory_data:

@@ -1,0 +1,144 @@
+# TencentDB Agent Memory Gateway Standalone Docker
+
+This directory builds a Gateway-only Docker image for TencentDB Agent Memory. It clones the GitHub release tag `v1.0.0-beta.1`, verifies that the checked-out commit is exactly `36b0537676dc31b7b1a61f23521303c9a148b509`, installs runtime dependencies from that source tree, and starts only the Node Gateway. It does not install or run Hermes, OpenClaw, or any host agent.
+
+The standalone config uses OpenRouter embeddings with `qwen/qwen3-embedding-8b` at 4096 dimensions. The L1/L2/L3 memory extraction pipeline still needs a separate chat/completion LLM, configured with `TDAI_LLM_BASE_URL`, `TDAI_LLM_API_KEY`, and `TDAI_LLM_MODEL`.
+
+## Files
+
+- `Dockerfile`: Node 22.16 Gateway-only image pinned to GitHub tag `v1.0.0-beta.1` and verified against commit `36b0537676dc31b7b1a61f23521303c9a148b509`.
+- `docker-compose.yml`: Local service, data volume, config mount, port mapping, and healthcheck.
+- `tdai-gateway.standalone.yaml`: Gateway, data, LLM, and OpenRouter embedding config.
+- `.env.example`: Secret-safe template. Copy it to `.env.local` before running.
+
+## Configure Secrets
+
+Create a local env file from the example and edit it with your real keys:
+
+```bash
+cd docker/standalone
+cp .env.example .env.local
+```
+
+Set these values in `.env.local`:
+
+```bash
+OPENROUTER_API_KEY=your-openrouter-api-key
+TDAI_LLM_BASE_URL=https://api.openai.com/v1
+TDAI_LLM_API_KEY=your-chat-llm-api-key
+TDAI_LLM_MODEL=gpt-4o-mini
+TDAI_GATEWAY_API_KEY=replace-with-a-long-random-token
+```
+
+The container fails fast at startup if `OPENROUTER_API_KEY`, `TDAI_LLM_API_KEY`, or `TDAI_GATEWAY_API_KEY` is empty or still set to the example placeholder value.
+
+Do not put real API keys in `Dockerfile`, `docker-compose.yml`, or `tdai-gateway.standalone.yaml`.
+
+## Build
+
+Both commands below build from the `docker/standalone` directory. During the image build, Docker clones GitHub tag `v1.0.0-beta.1` inside the image, verifies that `git rev-parse HEAD` matches `36b0537676dc31b7b1a61f23521303c9a148b509`, and then installs dependencies instead of pulling the beta package from npm.
+
+```bash
+cd docker/standalone
+docker compose build
+```
+
+Or build directly:
+
+```bash
+cd docker/standalone
+docker build -t tdai-memory-gateway:1.0.0-beta.1 .
+```
+
+## Run
+
+```bash
+cd docker/standalone
+docker compose up -d
+```
+
+The default compose publish is `127.0.0.1:8420:8420`, so the Gateway listens on `http://127.0.0.1:8420` by default and stores data in the named Docker volume `tdai_memory_data`, mounted at `/data/memory-tdai` inside the container.
+
+If you need to expose the Gateway beyond localhost, first set a strong non-empty `TDAI_GATEWAY_API_KEY`, then add network controls such as a firewall rule, reverse proxy allow-list, private subnet, or VPN before changing the published host binding.
+
+## Health Check
+
+`GET /health` does not require authentication:
+
+```bash
+curl http://127.0.0.1:8420/health
+```
+
+The container also includes a Docker healthcheck for `http://127.0.0.1:8420/health`.
+
+## Authenticated Requests
+
+When `TDAI_GATEWAY_API_KEY` is set in `.env.local`, all routes except `GET /health` require a Bearer token.
+
+Set the token in your shell:
+
+```bash
+export TDAI_GATEWAY_API_KEY="replace-with-a-long-random-token"
+```
+
+Test an authenticated recall request:
+
+```bash
+curl -X POST http://127.0.0.1:8420/recall \
+  -H "Authorization: Bearer ${TDAI_GATEWAY_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"query":"test memory","session_key":"standalone-demo"}'
+```
+
+## CORS
+
+Set `TDAI_CORS_ORIGINS` in `.env.local` when a browser client needs cross-origin access:
+
+```bash
+TDAI_CORS_ORIGINS=http://localhost:3000
+```
+
+This works because `tdai-gateway.standalone.yaml` does not set `server.corsOrigins`. If `TDAI_CORS_ORIGINS` is unset, the default remains no CORS response headers.
+
+## SDK v2 Notes
+
+For SDK v2 clients, use:
+
+- endpoint: `http://127.0.0.1:8420`
+- serviceId or service_id: `default`
+- apiKey or api_key: the same value as `TDAI_GATEWAY_API_KEY` when auth is enabled
+
+If you explicitly disable gateway auth for local-only testing, use a non-empty local value such as `local` for the SDK field instead of an empty string.
+
+## Logs And Shutdown
+
+```bash
+cd docker/standalone
+docker compose logs -f tdai-gateway
+docker compose down
+```
+
+To remove the persisted memory volume as well:
+
+```bash
+cd docker/standalone
+docker compose down -v
+```
+
+## Runtime Defaults
+
+The image and compose file set these runtime values:
+
+```bash
+TDAI_GATEWAY_CONFIG=/config/tdai-gateway.standalone.yaml
+TDAI_DATA_DIR=/data/memory-tdai
+TDAI_GATEWAY_HOST=0.0.0.0
+TDAI_GATEWAY_PORT=8420
+TDAI_DEPLOY_MODE=standalone
+```
+
+The Gateway command is:
+
+```bash
+node --import tsx/esm src/gateway/server.ts
+```

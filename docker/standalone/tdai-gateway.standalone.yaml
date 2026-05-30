@@ -1,0 +1,253 @@
+# TencentDB Agent Memory Gateway standalone config template.
+#
+# Env precedence notes:
+# - This file is loaded as the main gateway config.
+# - Whole-string ${VAR} substitution is safe for string fields only.
+# - Numeric and boolean fields should stay as YAML literals here unless an
+#   entrypoint renderer is added to convert env strings into typed values.
+# - Keep server.corsOrigins unset in this file if you want TDAI_CORS_ORIGINS
+#   from the container environment to remain effective.
+# - Do not put real secrets into this file. Put string secrets in .env.local.
+
+# Deployment identity.
+# The standalone image already exports TDAI_DEPLOY_MODE=standalone, so this can
+# stay commented unless you want to pin it in YAML.
+# deployMode: "standalone"
+# stateBackend: "file"
+# instanceId: "tdai-gateway-standalone"
+
+server:
+  # Bind on all interfaces inside the container so Docker port publishing works.
+  host: "0.0.0.0"
+
+  # Active container port. Keep this numeric literal in YAML.
+  port: 8420
+
+  # Gateway auth secret. String env substitution is safe here.
+  apiKey: "${TDAI_GATEWAY_API_KEY}"
+
+  # IMPORTANT: leave corsOrigins unset here so TDAI_CORS_ORIGINS can still be
+  # injected by the runtime environment. Do not add an active empty list.
+  # corsOrigins:
+  #   - "http://localhost:3000"
+
+data:
+  # Named Docker volume mount inside the standalone container.
+  baseDir: "/data/memory-tdai"
+
+  # Optional examples.
+  # refsDir: "/data/memory-tdai/refs"
+  # cleanupOnBoot: false
+
+llm:
+  # Standalone chat/completion LLM used for extraction and memory pipelines.
+  # Keep string placeholders active; keep numeric fields as YAML literals.
+  baseUrl: "${TDAI_LLM_BASE_URL}"
+  apiKey: "${TDAI_LLM_API_KEY}"
+  model: "${TDAI_LLM_MODEL}"
+  maxTokens: 4096
+  timeoutMs: 120000
+
+  # Optional string-only examples for later env exposure.
+  # provider: "openai"
+  # organization: ""
+  # project: ""
+
+# Optional external services. Leave commented unless your deployment needs them.
+# redis:
+#   host: "127.0.0.1"
+#   port: 6379
+#   password: "${REDIS_PASSWORD}"
+#   db: 0
+#   keyPrefix: "tdai:"
+#
+# shark:
+#   baseUrl: "http://127.0.0.1:8080"
+#   vdbTtlMs: 86400000
+#   cosBufferMs: 300000
+#   maxInstances: 64
+#
+# scanner:
+#   instances: "default"
+#   instancesSharkUrl: "http://127.0.0.1:8080"
+#   intervalMs: 30000
+#   nodeId: "scanner-standalone-01"
+#
+# worker:
+#   pollMs: 1000
+#   concurrency: 2
+#
+# cos:
+#   domain: "https://example-cos.invalid"
+
+# Observability integrations. Most fields are intentionally commented because
+# numeric and boolean values should be edited here as typed YAML literals.
+# observability:
+#   otel:
+#     enabled: false
+#     endpoint: "http://127.0.0.1:4318"
+#     protocol: "http/protobuf"
+#     headers: "Authorization=Bearer token,x-tenant-id=tenant-a"
+#     serviceName: "tdai-gateway"
+#     serviceVersion: "1.0.0-beta.1"
+#     instanceId: "tdai-gateway-standalone"
+#     tenantId: "tenant-a"
+#     metricExportInterval: 60000
+#     logExportInterval: 60000
+#
+#   clickhouse:
+#     enabled: false
+#     endpoint: "http://127.0.0.1:8123"
+#     username: "default"
+#     password: "${CLICKHOUSE_PASSWORD}"
+#     database: "tdai"
+#     table: "gateway_events"
+#     maxBatchSize: 1000
+#     flushInterval: 5000
+#     maxQueueSize: 10000
+#
+#   kafka:
+#     enabled: false
+#     brokers: "127.0.0.1:9092,127.0.0.1:9093"
+#     topic: "tdai-events"
+#     groupId: "tdai-observability"
+#     totalPartitions: 3
+#
+#   langfuse:
+#     enabled: false
+#     host: "https://cloud.langfuse.com"
+#     publicKey: "${LANGFUSE_PUBLIC_KEY}"
+#     secretKey: "${LANGFUSE_SECRET_KEY}"
+#
+#   # Keep concise optional placeholders only.
+#   barad:
+#     baseUrl: "http://127.0.0.1:9000"
+#
+#   zhiyan:
+#     baseUrl: "http://127.0.0.1:9100"
+
+memory:
+  # Standalone local backend.
+  storeBackend: "sqlite"
+
+  # Optional higher-level state choices.
+  # stateBackend: "file"
+
+  # Conversation capture controls.
+  # capture:
+  #   enabled: true
+  #   excludeAgents: []
+  #   l0l1RetentionDays: 0
+  #   allowAggressiveCleanup: false
+
+  # L1 extraction controls.
+  # extraction:
+  #   enabled: true
+  #   enableDedup: true
+  #   maxMemoriesPerSession: 20
+  #   model: "openai/gpt-4o-mini"
+
+  # L3 persona controls.
+  # persona:
+  #   triggerEveryN: 50
+  #   maxScenes: 15
+  #   backupCount: 3
+  #   sceneBackupCount: 10
+  #   model: "openai/gpt-4o-mini"
+
+  # Pipeline scheduling.
+  # pipeline:
+  #   everyNConversations: 5
+  #   enableWarmup: true
+  #   l1IdleTimeoutSeconds: 600
+  #   l2DelayAfterL1Seconds: 10
+  #   l2MinIntervalSeconds: 900
+  #   l2MaxIntervalSeconds: 3600
+  #   sessionActiveWindowHours: 24
+
+  recall:
+    # Preserve the current default recall strategy.
+    strategy: "hybrid"
+    timeoutMs: 30000
+
+    # Optional typed examples.
+    # enabled: true
+    # maxResults: 5
+    # maxCharsPerMemory: 0
+    # maxTotalRecallChars: 0
+    # scoreThreshold: 0.3
+    # timeoutMs: 5000
+
+  embedding:
+    # Active OpenRouter embedding config required by the standalone image.
+    enabled: true
+    provider: "openrouter"
+    baseUrl: "https://openrouter.ai/api/v1"
+    apiKey: "${OPENROUTER_API_KEY}"
+    model: "qwen/qwen3-embedding-8b"
+    dimensions: 4096
+    sendDimensions: false
+    timeoutMs: 30000
+    recallTimeoutMs: 30000
+    captureTimeoutMs: 60000
+
+    # Optional alternatives. Keep booleans and numbers as YAML literals.
+    # conflictRecallTopK controls dedup conflict search breadth.
+    # conflictRecallTopK: 5
+    # proxyUrl: "http://127.0.0.1:8787/embedding-proxy"
+    # maxInputChars: 5000
+    # timeoutMs: 30000
+    # recallTimeoutMs: 3000
+    # captureTimeoutMs: 15000
+
+  # BM25 keyword recall.
+  # bm25:
+  #   enabled: true
+  #   language: "zh"
+
+  # Tencent Cloud Vector DB backend example.
+  # tcvdb:
+  #   url: "https://example.tencentcloudapi.com"
+  #   username: "root"
+  #   apiKey: "${TCVDB_API_KEY}"
+  #   database: "tdai_memory"
+  #   alias: "primary"
+  #   embeddingModel: "bge-large-zh"
+  #   timeout: 10000
+  #   caPemPath: "/etc/ssl/certs/tcvdb-ca.pem"
+
+  # Reporting hooks.
+  # report:
+  #   enabled: false
+  #   type: "local"
+
+  # Optional memory-specific LLM override when different from top-level llm.
+  # llm:
+  #   enabled: true
+  #   baseUrl: "${TDAI_MEMORY_LLM_BASE_URL}"
+  #   apiKey: "${TDAI_MEMORY_LLM_API_KEY}"
+  #   model: "${TDAI_MEMORY_LLM_MODEL}"
+  #   maxTokens: 4096
+  #   timeoutMs: 120000
+
+  # Short-term context offload / compression.
+  # offload:
+  #   enabled: false
+  #   mode: "local"
+  #   model: "openai/gpt-4o-mini"
+  #   temperature: 0.2
+  #   forceTriggerThreshold: 4
+  #   dataDir: "/data/context-offload"
+  #   defaultContextWindow: 200000
+  #   maxPairsPerBatch: 20
+  #   l2NullThreshold: 4
+  #   l2TimeoutSeconds: 300
+  #   mildOffloadRatio: 0.5
+  #   aggressiveCompressRatio: 0.85
+  #   mmdMaxTokenRatio: 0.2
+  #   backendUrl: "https://example.invalid/offload"
+  #   backendApiKey: "${OFFLOAD_API_KEY}"
+  #   backendTimeoutMs: 120000
+  #   offloadRetentionDays: 7
+  #   logMaxSizeMb: 50
+  #   userId: "standalone-user"
