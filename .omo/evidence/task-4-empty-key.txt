@@ -1,0 +1,8 @@
+OpenCode plugin config empty apiKey failure verification
+
+Command:
+node --import tsx/esm -e "import { parseOpenCodePluginConfig } from './src/adapters/opencode/config.ts'; try { parseOpenCodePluginConfig({ apiKey: '   ' }); console.log('unexpected-success'); } catch (error) { console.log(error instanceof Error ? error.message : String(error)); }"
+
+Observed result:
+- parseOpenCodePluginConfig() rejected whitespace-only apiKey
+- Error message: OpenCode plugin apiKey is required. Set config.apiKey or TDAI_GATEWAY_API_KEY.

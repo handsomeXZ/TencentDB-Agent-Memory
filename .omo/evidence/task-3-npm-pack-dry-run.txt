@@ -1,0 +1,215 @@
+﻿
+> @tencentdb-agent-memory/memory-tencentdb@0.3.6 prepack
+> npm run build
+
+
+> @tencentdb-agent-memory/memory-tencentdb@0.3.6 build
+> npm run build:plugin && npm run build:scripts
+
+
+> @tencentdb-agent-memory/memory-tencentdb@0.3.6 build:plugin
+> tsdown
+
+node.exe : [tsdown] Node.js v22.17.0 is deprecated. Support will be removed in the next minor release. Please upgrade t
+o Node.js v22.18.0 or later.
+所在位置 D:\Install\WorkSpace\NodeJs\npm.ps1:29 字符: 3
++   & $NODE_EXE $NPM_CLI_JS $args
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([tsdown] Node.j....18.0 or later.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+鈩?tsdown v0.21.10 powered by rolldown v1.0.0-rc.17
+鈩?config file: D:\ForkWorkSpace\TencentDB-Agent-Memory\tsdown.config.ts (unrun)
+鈩?entry: ./index.ts
+鈩?target: node22.16.0
+鈩?entry: ./src/opencode/server.ts
+鈩?target: node22.16.0
+鈩?Build start
+鈩?Cleaning 6 files
+鈩?dist\opencode\server.js    0.15 kB 鈹?gzip: 0.13 kB
+鈩?dist\opencode\server.d.ts  0.27 kB 鈹?gzip: 0.17 kB
+鈩?2 files, total: 0.42 kB
+鉁?Build complete in 388ms
+鈩?dist\index.mjs               758.34 kB 鈹?gzip: 202.07 kB
+鈩?dist\l1-reader-B6GBuxTv.mjs    3.67 kB 鈹?gzip:   1.52 kB
+鈩?2 files, total: 762.01 kB
+鉁?Build complete in 397ms
+
+> @tencentdb-agent-memory/memory-tencentdb@0.3.6 build:scripts
+> npm run build:migrate-sqlite-to-vdb && npm run build:export-tencent-vdb && npm run build:read-local-memory
+
+
+> @tencentdb-agent-memory/memory-tencentdb@0.3.6 build:migrate-sqlite-to-vdb
+> tsc -p scripts/migrate-sqlite-to-tcvdb/tsconfig.json --noEmitOnError false
+
+
+> @tencentdb-agent-memory/memory-tencentdb@0.3.6 build:export-tencent-vdb
+> tsc --project scripts/export-tencent-vdb/tsconfig.json
+
+
+> @tencentdb-agent-memory/memory-tencentdb@0.3.6 build:read-local-memory
+> tsc --project scripts/read-local-memory/tsconfig.json
+
+npm notice
+npm notice package: @tencentdb-agent-memory/memory-tencentdb@0.3.6
+npm notice Tarball Contents
+npm notice 27.2kB CHANGELOG.md
+npm notice 1.3kB LICENSE
+npm notice 23.1kB README.md
+npm notice 710B bin/export-tencent-vdb.mjs
+npm notice 472B bin/migrate-sqlite-to-tcvdb.mjs
+npm notice 737B bin/read-local-memory.mjs
+npm notice 758.3kB dist/index.mjs
+npm notice 3.7kB dist/l1-reader-B6GBuxTv.mjs
+npm notice 274B dist/opencode/server.d.ts
+npm notice 149B dist/opencode/server.js
+npm notice 51.6kB hermes-plugin/memory/memory_tencentdb/__init__.py
+npm notice 8.0kB hermes-plugin/memory/memory_tencentdb/client.py
+npm notice 470B hermes-plugin/memory/memory_tencentdb/plugin.yaml
+npm notice 15.1kB hermes-plugin/memory/memory_tencentdb/README.md
+npm notice 14.0kB hermes-plugin/memory/memory_tencentdb/supervisor.py
+npm notice 36.7kB index.ts
+npm notice 13.1kB openclaw.plugin.json
+npm notice 4.0kB package.json
+npm notice 19.4kB scripts/export-tencent-vdb/dist/export-tencent-vdb.js
+npm notice 14.9kB scripts/install_hermes_memory_tencentdb.sh
+npm notice 39.8kB scripts/memory-tencentdb-ctl.sh
+npm notice 400B scripts/migrate-sqlite-to-tcvdb/dist/scripts/migrate-sqlite-to-tcvdb/cli-entry.js
+npm notice 2.4kB scripts/migrate-sqlite-to-tcvdb/dist/scripts/migrate-sqlite-to-tcvdb/config-write.js
+npm notice 1.4kB scripts/migrate-sqlite-to-tcvdb/dist/scripts/migrate-sqlite-to-tcvdb/manifest-write.js
+npm notice 27.2kB scripts/migrate-sqlite-to-tcvdb/dist/scripts/migrate-sqlite-to-tcvdb/sqlite-to-tcvdb.js
+npm notice 8.1kB scripts/migrate-sqlite-to-tcvdb/dist/src/core/profile/profile-sync.js
+npm notice 6.5kB scripts/migrate-sqlite-to-tcvdb/dist/src/core/record/l1-writer.js
+npm notice 1.7kB scripts/migrate-sqlite-to-tcvdb/dist/src/core/scene/scene-format.js
+npm notice 2.8kB scripts/migrate-sqlite-to-tcvdb/dist/src/core/scene/scene-index.js
+npm notice 2.4kB scripts/migrate-sqlite-to-tcvdb/dist/src/core/scene/scene-navigation.js
+npm notice 2.3kB scripts/migrate-sqlite-to-tcvdb/dist/src/core/store/bm25-local.js
+npm notice 19.2kB scripts/migrate-sqlite-to-tcvdb/dist/src/core/store/embedding.js
+npm notice 81.9kB scripts/migrate-sqlite-to-tcvdb/dist/src/core/store/sqlite.js
+npm notice 9.5kB scripts/migrate-sqlite-to-tcvdb/dist/src/core/store/tcvdb-client.js
+npm notice 45.0kB scripts/migrate-sqlite-to-tcvdb/dist/src/core/store/tcvdb.js
+npm notice 850B scripts/migrate-sqlite-to-tcvdb/dist/src/core/store/types.js
+npm notice 3.3kB scripts/migrate-sqlite-to-tcvdb/dist/src/utils/manifest.js
+npm notice 8.5kB scripts/migrate-sqlite-to-tcvdb/README.md
+npm notice 15.8kB scripts/openclaw-after-tool-call-messages.patch.sh
+npm notice 34.3kB scripts/read-local-memory/dist/read-local-memory.js
+npm notice 17.7kB scripts/README.memory-tencentdb-ctl.md
+npm notice 14.3kB scripts/setup-offload.sh
+npm notice 1.3kB src/adapters/index.ts
+npm notice 3.6kB src/adapters/openclaw/host-adapter.ts
+npm notice 332B src/adapters/openclaw/index.ts
+npm notice 3.3kB src/adapters/openclaw/llm-runner.ts
+npm notice 4.7kB src/adapters/opencode/config.ts
+npm notice 274B src/adapters/opencode/index.ts
+npm notice 4.1kB src/adapters/opencode/policy.ts
+npm notice 2.7kB src/adapters/standalone/host-adapter.ts
+npm notice 365B src/adapters/standalone/index.ts
+npm notice 10.9kB src/adapters/standalone/llm-runner.ts
+npm notice 10.8kB src/cli/commands/seed.ts
+npm notice 1.9kB src/cli/index.ts
+npm notice 4.8kB src/cli/README.md
+npm notice 27.6kB src/config.ts
+npm notice 22.7kB src/core/conversation/l0-recorder.ts
+npm notice 15.2kB src/core/hooks/auto-capture.ts
+npm notice 35.9kB src/core/hooks/auto-recall.ts
+npm notice 639B src/core/index.ts
+npm notice 9.3kB src/core/persona/persona-generator.ts
+npm notice 4.5kB src/core/persona/persona-trigger.ts
+npm notice 8.5kB src/core/profile/profile-sync.ts
+npm notice 7.5kB src/core/prompts/l1-dedup.ts
+npm notice 7.0kB src/core/prompts/l1-extraction.ts
+npm notice 8.7kB src/core/prompts/persona-generation.ts
+npm notice 16.9kB src/core/prompts/scene-extraction.ts
+npm notice 15.3kB src/core/record/l1-dedup.ts
+npm notice 18.8kB src/core/record/l1-extractor.ts
+npm notice 6.7kB src/core/record/l1-reader.ts
+npm notice 10.3kB src/core/record/l1-writer.ts
+npm notice 2.9kB src/core/report/reporter.ts
+npm notice 7.3kB src/core/scene/filename-normalizer.ts
+npm notice 21.1kB src/core/scene/scene-extractor.ts
+npm notice 2.0kB src/core/scene/scene-format.ts
+npm notice 3.0kB src/core/scene/scene-index.ts
+npm notice 2.5kB src/core/scene/scene-navigation.ts
+npm notice 15.6kB src/core/seed/input.ts
+npm notice 15.1kB src/core/seed/seed-runtime.ts
+npm notice 3.8kB src/core/seed/types.ts
+npm notice 5.2kB src/core/store/bm25-client.ts
+npm notice 2.9kB src/core/store/bm25-local.ts
+npm notice 24.6kB src/core/store/embedding.ts
+npm notice 4.6kB src/core/store/factory.ts
+npm notice 1.9kB src/core/store/search-utils.ts
+npm notice 87.2kB src/core/store/sqlite.ts
+npm notice 10.9kB src/core/store/tcvdb-client.ts
+npm notice 44.9kB src/core/store/tcvdb.ts
+npm notice 11.9kB src/core/store/types.ts
+npm notice 20.0kB src/core/tdai-core.ts
+npm notice 9.5kB src/core/tools/conversation-search.ts
+npm notice 9.7kB src/core/tools/memory-search.ts
+npm notice 8.5kB src/core/types.ts
+npm notice 6.1kB src/gateway-client/client.ts
+npm notice 12.1kB src/gateway/config.ts
+npm notice 21.7kB src/gateway/server.ts
+npm notice 3.2kB src/gateway/types.ts
+npm notice 13.6kB src/offload/backend-client.ts
+npm notice 4.0kB src/offload/benchmark-token-estimate.ts
+npm notice 5.6kB src/offload/context-token-tracker.ts
+npm notice 10.3kB src/offload/fast-token-estimate.ts
+npm notice 30.0kB src/offload/hooks/after-tool-call.ts
+npm notice 5.5kB src/offload/hooks/before-agent-start.ts
+npm notice 13.9kB src/offload/hooks/before-prompt-build.ts
+npm notice 67.2kB src/offload/hooks/llm-input-l3.ts
+npm notice 759B src/offload/hooks/llm-output.ts
+npm notice 119.7kB src/offload/index.ts
+npm notice 10.7kB src/offload/l3-helpers.ts
+npm notice 1.3kB src/offload/l3-token-counter.ts
+npm notice 606B src/offload/l3-token-helpers.ts
+npm notice 6.2kB src/offload/local-llm/index.ts
+npm notice 2.3kB src/offload/local-llm/llm-caller.ts
+npm notice 3.0kB src/offload/local-llm/parsers/json-utils.ts
+npm notice 1.1kB src/offload/local-llm/parsers/l1-parser.ts
+npm notice 2.9kB src/offload/local-llm/parsers/l2-parser.ts
+npm notice 1.3kB src/offload/local-llm/parsers/l15-parser.ts
+npm notice 5.6kB src/offload/local-llm/prompts/l1-prompt.ts
+npm notice 8.0kB src/offload/local-llm/prompts/l2-prompt.ts
+npm notice 5.2kB src/offload/local-llm/prompts/l15-prompt.ts
+npm notice 14.8kB src/offload/mmd-injector.ts
+npm notice 2.0kB src/offload/mmd-meta.ts
+npm notice 13.0kB src/offload/opik-tracer.ts
+npm notice 9.8kB src/offload/pipelines/l2-mermaid.ts
+npm notice 16.0kB src/offload/reclaimer.ts
+npm notice 4.9kB src/offload/session-registry.ts
+npm notice 18.4kB src/offload/state-manager.ts
+npm notice 13.3kB src/offload/state-reporter.ts
+npm notice 23.6kB src/offload/storage.ts
+npm notice 1.2kB src/offload/time-utils.ts
+npm notice 9.3kB src/offload/types.ts
+npm notice 2.6kB src/offload/user-id.ts
+npm notice 227B src/opencode/server.ts
+npm notice 7.4kB src/utils/backup.ts
+npm notice 18.4kB src/utils/checkpoint.ts
+npm notice 24.4kB src/utils/clean-context-runner.ts
+npm notice 9.4kB src/utils/ensure-hook-policy.ts
+npm notice 571B src/utils/env.ts
+npm notice 4.8kB src/utils/managed-timer.ts
+npm notice 4.7kB src/utils/manifest.ts
+npm notice 13.3kB src/utils/memory-cleaner.ts
+npm notice 1.4kB src/utils/openclaw-state-dir.ts
+npm notice 27.1kB src/utils/pipeline-factory.ts
+npm notice 45.2kB src/utils/pipeline-manager.ts
+npm notice 16.5kB src/utils/sanitize.ts
+npm notice 3.7kB src/utils/serial-queue.ts
+npm notice 3.6kB src/utils/session-filter.ts
+npm notice 944B src/utils/text-utils.ts
+npm notice Tarball Details
+npm notice name: @tencentdb-agent-memory/memory-tencentdb
+npm notice version: 0.3.6
+npm notice filename: tencentdb-agent-memory-memory-tencentdb-0.3.6.tgz
+npm notice package size: 686.5 kB
+npm notice unpacked size: 2.6 MB
+npm notice shasum: 93f95d50e85b77799b65884ba9bebca4f4f18931
+npm notice integrity: sha512-sPEz4QHY7oYej[...]r8FIeuLFAGaaA==
+npm notice total files: 147
+npm notice
+tencentdb-agent-memory-memory-tencentdb-0.3.6.tgz
+
+SUMMARY: PASS - npm pack --dry-run completed; verify listed dist/opencode/server.js and dist/opencode/server.d.ts; no .omo/evidence entries; no tests entries after package files exclusions.

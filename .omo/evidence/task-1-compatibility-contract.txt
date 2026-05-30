@@ -1,0 +1,42 @@
+﻿COMMAND: rg -n b956e9a06f2bf4e3a6ff026d0566c362f57a76b7 .omo/plans/opencode-tencentdb-memory-plugin.md docs/opencode-plugin-compatibility.md
+target_commit=b956e9a06f2bf4e3a6ff026d0566c362f57a76b7
+
+PLAN_AND_NOTE_COMMIT_MATCHES:
+.omo\plans\opencode-tencentdb-memory-plugin.md:131:  - External: `https://github.com/anomalyco/opencode/blob/b956e9a06f2bf4e3a6ff026d0566c362f57a76b7/packages/web/src/content/docs/plugins.mdx#L18-L63` - local/global plugin loading rules.
+.omo\plans\opencode-tencentdb-memory-plugin.md:132:  - External: `https://github.com/anomalyco/opencode/blob/b956e9a06f2bf4e3a6ff026d0566c362f57a76b7/packages/plugin/src/index.ts#L222-L334` - plugin hooks/events type surface.
+.omo\plans\opencode-tencentdb-memory-plugin.md:133:  - External: `https://github.com/anomalyco/opencode/blob/b956e9a06f2bf4e3a6ff026d0566c362f57a76b7/packages/plugin/src/tool.ts#L45-L54` - `tool()` helper contract.
+.omo\plans\opencode-tencentdb-memory-plugin.md:134:  - External: `https://github.com/anomalyco/opencode/blob/b956e9a06f2bf4e3a6ff026d0566c362f57a76b7/packages/opencode/src/plugin/shared.ts#L103-L114` - server entry resolution.
+.omo\plans\opencode-tencentdb-memory-plugin.md:215:  - External: `https://github.com/anomalyco/opencode/blob/b956e9a06f2bf4e3a6ff026d0566c362f57a76b7/packages/plugin/package.json#L11-L15` - OpenCode plugin package exports.
+.omo\plans\opencode-tencentdb-memory-plugin.md:256:  - External: `https://github.com/anomalyco/opencode/blob/b956e9a06f2bf4e3a6ff026d0566c362f57a76b7/packages/web/src/content/docs/config.mdx#L753-L763` - OpenCode plugin config loading.
+.omo\plans\opencode-tencentdb-memory-plugin.md:378:  - External: `https://github.com/anomalyco/opencode/blob/b956e9a06f2bf4e3a6ff026d0566c362f57a76b7/packages/plugin/src/index.ts#L222-L334` - OpenCode plugin hook types.
+.omo\plans\opencode-tencentdb-memory-plugin.md:419:  - External: `https://github.com/anomalyco/opencode/blob/b956e9a06f2bf4e3a6ff026d0566c362f57a76b7/packages/web/src/content/docs/plugins.mdx#L278-L313` - OpenCode custom tool docs.
+.omo\plans\opencode-tencentdb-memory-plugin.md:420:  - External: `https://github.com/anomalyco/opencode/blob/b956e9a06f2bf4e3a6ff026d0566c362f57a76b7/packages/plugin/src/tool.ts#L45-L54` - `tool()` contract.
+.omo\plans\opencode-tencentdb-memory-plugin.md:465:  - External: `https://github.com/anomalyco/opencode/blob/b956e9a06f2bf4e3a6ff026d0566c362f57a76b7/packages/plugin/src/index.ts#L222-L334` - hook/event API surface.
+.omo\plans\opencode-tencentdb-memory-plugin.md:547:  - External: `https://github.com/anomalyco/opencode/blob/b956e9a06f2bf4e3a6ff026d0566c362f57a76b7/packages/opencode/src/plugin/shared.ts#L103-L114` - server entry resolution.
+.omo\plans\opencode-tencentdb-memory-plugin.md:548:  - External: `https://github.com/anomalyco/opencode/blob/b956e9a06f2bf4e3a6ff026d0566c362f57a76b7/packages/plugin/src/index.ts#L222-L334` - plugin lifecycle hooks.
+.omo\plans\opencode-tencentdb-memory-plugin.md:591:  - External: `https://github.com/anomalyco/opencode/blob/b956e9a06f2bf4e3a6ff026d0566c362f57a76b7/packages/plugin/src/tool.ts#L45-L54` - `tool()` helper.
+.omo\plans\opencode-tencentdb-memory-plugin.md:671:  - External: `https://github.com/anomalyco/opencode/blob/b956e9a06f2bf4e3a6ff026d0566c362f57a76b7/packages/web/src/content/docs/plugins.mdx#L18-L63` - local plugin directory rules.
+.omo\plans\opencode-tencentdb-memory-plugin.md:672:  - External: `https://github.com/anomalyco/opencode/blob/b956e9a06f2bf4e3a6ff026d0566c362f57a76b7/packages/web/src/content/docs/config.mdx#L753-L763` - npm plugin config.
+docs\opencode-plugin-compatibility.md:5:- Target source: `anomalyco/opencode` commit `b956e9a06f2bf4e3a6ff026d0566c362f57a76b7`.
+docs\opencode-plugin-compatibility.md:64:- Plugin loading docs: `https://github.com/anomalyco/opencode/blob/b956e9a06f2bf4e3a6ff026d0566c362f57a76b7/packages/web/src/content/docs/plugins.mdx`
+docs\opencode-plugin-compatibility.md:65:- Hooks/events type surface: `https://github.com/anomalyco/opencode/blob/b956e9a06f2bf4e3a6ff026d0566c362f57a76b7/packages/plugin/src/index.ts`
+docs\opencode-plugin-compatibility.md:66:- Tool helper contract: `https://github.com/anomalyco/opencode/blob/b956e9a06f2bf4e3a6ff026d0566c362f57a76b7/packages/plugin/src/tool.ts`
+docs\opencode-plugin-compatibility.md:67:- Server entry resolution: `https://github.com/anomalyco/opencode/blob/b956e9a06f2bf4e3a6ff026d0566c362f57a76b7/packages/opencode/src/plugin/shared.ts`
+docs\opencode-plugin-compatibility.md:68:- Package version source: `https://github.com/anomalyco/opencode/blob/b956e9a06f2bf4e3a6ff026d0566c362f57a76b7/packages/opencode/package.json` and `https://github.com/anomalyco/opencode/blob/b956e9a06f2bf4e3a6ff026d0566c362f57a76b7/packages/plugin/package.json`
+
+COMMAND: rg -n opencode.*1\.15\.12|@opencode-ai/plugin.*1\.15\.12|no installed docs/opencode-plugin-compatibility.md
+VERSION_AND_INSTALLATION_NOTE:
+6:- Target package versions at that commit: `opencode` `1.15.12` and `@opencode-ai/plugin` `1.15.12`.
+7:- Local installed package check: this repository currently has no installed `node_modules/@opencode-ai/plugin`, `node_modules/opencode`, or `node_modules/@opencode-ai/opencode` package, so this contract is pinned to the source commit above rather than a local package installation.
+
+COMMAND: rg -n packages/(web|plugin|opencode).*docs|packages/plugin/src/(index|tool)\.ts|packages/opencode/src/plugin/shared\.ts docs/opencode-plugin-compatibility.md
+SOURCE_URL_MATCHES:
+64:- Plugin loading docs: `https://github.com/anomalyco/opencode/blob/b956e9a06f2bf4e3a6ff026d0566c362f57a76b7/packages/web/src/content/docs/plugins.mdx`
+65:- Hooks/events type surface: `https://github.com/anomalyco/opencode/blob/b956e9a06f2bf4e3a6ff026d0566c362f57a76b7/packages/plugin/src/index.ts`
+66:- Tool helper contract: `https://github.com/anomalyco/opencode/blob/b956e9a06f2bf4e3a6ff026d0566c362f57a76b7/packages/plugin/src/tool.ts`
+67:- Server entry resolution: `https://github.com/anomalyco/opencode/blob/b956e9a06f2bf4e3a6ff026d0566c362f57a76b7/packages/opencode/src/plugin/shared.ts`
+
+COMMAND: Test-Path node_modules OpenCode package locations
+node_modules/@opencode-ai/plugin/package.json=False
+node_modules/opencode/package.json=False
+node_modules/@opencode-ai/opencode/package.json=False

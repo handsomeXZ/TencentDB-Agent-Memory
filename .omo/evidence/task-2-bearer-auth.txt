@@ -1,0 +1,26 @@
+﻿Command: npx vitest run src/gateway-client/client.contract.test.ts --testNamePattern "Bearer auth" --reporter=tap
+
+TAP version 13
+1..1
+not ok 1 - src/gateway-client/client.contract.test.ts # time=16.00ms {
+    1..1
+    not ok 1 - GatewayHttpClient contract # time=15.19ms {
+        1..8
+        ok 1 - calls GET /health without Authorization # SKIP
+        not ok 2 - sends Bearer auth and JSON DTO bodies to every protected Gateway endpoint # time=14.66ms
+            ---
+            error:
+                name: "AssertionError"
+                message: "promise rejected \"Error: GatewayHttpClient implementation p鈥" instead of resolving"
+            at: "D:/ForkWorkSpace/TencentDB-Agent-Memory/src/gateway-client/client.contract.test.ts:158:56"
+            ...
+        ok 3 - normalizes a trailing slash in baseUrl without dropping nested base paths # SKIP
+        ok 4 - fails fast before protected network requests when missing API key # SKIP
+        ok 5 - redacts the raw token from 401 errors # SKIP
+        ok 6 - redacts the raw token from 5xx errors # SKIP
+        ok 7 - reports non-JSON Gateway responses without leaking the token # SKIP
+        ok 8 - aborts requests that exceed timeoutMs # SKIP
+    }
+}
+
+ExitCode: 1

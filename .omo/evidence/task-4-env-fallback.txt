@@ -1,0 +1,10 @@
+OpenCode plugin config env fallback verification
+
+Command:
+node --import tsx/esm -e "import { parseOpenCodePluginConfig, toLoggableOpenCodePluginConfig } from './src/adapters/opencode/config.ts'; const sentinel = '<redacted-sentinel>'; const config = parseOpenCodePluginConfig(undefined, { TDAI_GATEWAY_API_KEY: sentinel }); const acceptedEnvFallback = config.apiKey === sentinel; const loggable = toLoggableOpenCodePluginConfig(config); console.log(JSON.stringify({ acceptedEnvFallback, loggable }, null, 2));"
+
+Observed result:
+- parseOpenCodePluginConfig() accepted TDAI_GATEWAY_API_KEY from env fallback
+- Internal config.apiKey matched the provided sentinel without printing the sentinel
+- toLoggableOpenCodePluginConfig() returned apiKey as [redacted]
+- Defaults resolved to gatewayUrl=http://127.0.0.1:8420 timeoutMs=5000 capture.enabled=true recall.enabled=true recall.maxResults=5 recall.maxTotalChars=6000 tools.enabled=true redaction.enabled=true

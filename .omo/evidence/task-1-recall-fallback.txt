@@ -1,0 +1,22 @@
+﻿COMMAND: rg -n fallback docs/opencode-plugin-compatibility.md
+FALLBACK_MATCHES:
+51:- fallback: register explicit `tdai_memory_recall`, `tdai_memory_search`, and `tdai_conversation_search` tools. The agent can call these tools intentionally to retrieve memories or conversations.
+
+COMMAND: rg -n recall docs/opencode-plugin-compatibility.md
+RECALL_MATCHES:
+24:- The OpenCode server entry for this project should register exactly the v1 memory tools planned later: `tdai_memory_recall`, `tdai_memory_search`, and `tdai_conversation_search`.
+31:- Implementation should parse and validate only this plugin's options, including `gatewayUrl`, `apiKey`, `timeoutMs`, `recall`, `capture`, and `tools`, and must not infer configuration from OpenClaw-only metadata.
+38:- `experimental.session.compacting` can add compaction context or replace the compaction prompt, but that is not a v1 recall-injection guarantee.
+48:- Pre-model automatic recall injection is **not verified** by this task.
+49:- The pinned type surface exposes experimental hooks that can mutate chat messages or system prompt arrays, but the plan-referenced sources inspected here do not prove a stable, non-experimental, end-to-end pre-model context mutation path suitable for automatic recall injection.
+50:- Code-level decision: automatic pre-model recall injection is disabled for the first implementation until a later task verifies the concrete runtime path with tests against OpenCode.
+51:- fallback: register explicit `tdai_memory_recall`, `tdai_memory_search`, and `tdai_conversation_search` tools. The agent can call these tools intentionally to retrieve memories or conversations.
+52:- Best-effort supported hook behavior is limited to documented/type-surfaced hooks for capture, session lifecycle, permissions, and cleanup; it must not silently inject recall context into model input unless later verification proves the hook path.
+58:- Task 9 must test recall lifecycle through explicit tools first. Any automatic recall injection path must remain off unless runtime verification proves an allowed pre-model mutation path.
+
+COMMAND: rg -n "Pre-model automatic recall injection is \*\*not verified\*\*|automatic pre-model recall injection is disabled|tdai_memory_recall|tdai_memory_search|tdai_conversation_search|best-effort" docs/opencode-plugin-compatibility.md
+DECISION_MATCHES:
+24:- The OpenCode server entry for this project should register exactly the v1 memory tools planned later: `tdai_memory_recall`, `tdai_memory_search`, and `tdai_conversation_search`.
+48:- Pre-model automatic recall injection is **not verified** by this task.
+50:- Code-level decision: automatic pre-model recall injection is disabled for the first implementation until a later task verifies the concrete runtime path with tests against OpenCode.
+51:- fallback: register explicit `tdai_memory_recall`, `tdai_memory_search`, and `tdai_conversation_search` tools. The agent can call these tools intentionally to retrieve memories or conversations.

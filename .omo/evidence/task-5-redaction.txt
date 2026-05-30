@@ -1,0 +1,27 @@
+Task 5 redaction and capture minimization evidence
+
+Policy helper: src/adapters/opencode/policy.ts
+Targeted tests: src/adapters/opencode/policy.test.ts
+
+Capture policy:
+- Included: user text, final assistant text, host summary for oversized messages.
+- Excluded: system prompts, permission prompts, shell env, full tool output, binary content, oversized messages without host summary.
+- Tests assert the included and excluded category lists exactly.
+- Tests assert capture output contains only the two final-turn texts plus a host summary when oversized raw messages are supplied.
+
+Redaction policy:
+- Redacts API-key-like strings with an sk- prefix.
+- Redacts Authorization: Bearer values.
+- Redacts TDAI_GATEWAY_API_KEY assignments.
+- Redacts common *_API_KEY assignments.
+- Redacts TOKEN assignments.
+- Redacts shell env-like export PRIVATE_KEY assignments.
+
+Verification command:
+- npx vitest run src/adapters/opencode/policy.test.ts
+
+Result:
+- 1 test file passed, 6 tests passed.
+
+Secret-sentinel check:
+- This evidence intentionally describes sentinel classes without printing raw sentinel values.

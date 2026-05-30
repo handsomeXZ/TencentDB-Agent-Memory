@@ -1,0 +1,21 @@
+Task 5 session isolation evidence
+
+Policy helper: src/adapters/opencode/policy.ts
+Targeted tests: src/adapters/opencode/policy.test.ts
+
+Verified behavior:
+- Session key format is opencode:${workspaceHash}:${projectHash}:${sessionId}:${userHashOrLocal}.
+- Workspace and project identifiers are SHA-256 derived 16-hex hashes before leaving the helper.
+- User identifiers are SHA-256 derived 16-hex hashes when present, or local when absent.
+- Tests assert two different workspace/project values produce distinct keys.
+- Tests assert generated keys do not contain raw absolute path examples.
+- Final-turn idempotency key is stable for the same final turn and distinct for a different turn index.
+
+Verification command:
+- npx vitest run src/adapters/opencode/policy.test.ts
+
+Result:
+- 1 test file passed, 6 tests passed.
+
+Secret-sentinel check:
+- This evidence intentionally uses placeholders only and contains no raw secret sentinel values.

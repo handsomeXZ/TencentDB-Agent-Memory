@@ -1,0 +1,13 @@
+﻿PASS - main preserved
+PASS - root export import preserved
+PASS - root export default preserved
+PASS - server export types exact
+PASS - server export import exact
+PASS - openclaw extension preserved
+PASS - manifest id preserved
+PASS - dist index exists
+PASS - dist server js exists
+PASS - dist server dts exists
+PASS - server default has server function
+PASS - server placeholder returns object
+SUMMARY: PASS - OpenClaw root entry and metadata preserved while ./server points to OpenCode server build output.
