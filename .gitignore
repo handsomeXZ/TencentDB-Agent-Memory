@@ -14,6 +14,8 @@ docker/standalone/.env.local
 
 # Test caches
 __tests__/soak/.model-cache/
+.playwright-mcp/
+test-results/
 
 # Python cache
 __pycache__/
