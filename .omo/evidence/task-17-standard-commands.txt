@@ -1,0 +1,40 @@
+Task 17 standard command evidence
+Date: 2026-05-30
+Workspace: D:\ForkWorkSpace\TencentDB-Agent-Memory
+
+1. npm run build
+- Result: PASS
+- Notes: Built plugin and script targets successfully.
+- Observed outputs included:
+  - dist/opencode/server.js
+  - dist/opencode/server.d.ts
+- Non-blocking warning: tsdown reported local Node v22.17.0 is deprecated and recommends v22.18.0+.
+
+2. npm test
+- Result: PASS
+- Summary: 8 test files passed, 74 tests passed, 0 failed.
+
+3. npm pack --dry-run
+- Result: PASS
+- Confirmed packaged contents include:
+  - dist/opencode/server.js
+  - dist/opencode/server.d.ts
+  - docs/opencode-memory-plugin.md
+  - docs/opencode-plugin-compatibility.md
+- Additional package checks:
+  - prepack triggered npm run build successfully
+  - tarball filename: tencentdb-agent-memory-memory-tencentdb-0.3.6.tgz
+  - package size reported by npm notice: 710.9 kB
+
+4. OpenCode server import smoke
+- Command: node --input-type=module -e "await import('./dist/opencode/server.js'); console.log('import-ok')"
+- Result: PASS
+- Observed output: import-ok
+
+5. CI integration status
+- Updated .github/workflows/pr-ci.yml to run these CI-safe verification commands explicitly:
+  - npm run build
+  - npm test
+  - OpenCode server import smoke
+  - npm run smoke:opencode-gateway
+- Existing pack, manifest, and package size checks were preserved.

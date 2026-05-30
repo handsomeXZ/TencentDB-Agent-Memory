@@ -1,0 +1,14 @@
+Task 18 token redaction evidence
+
+Command:
+node --import tsx/esm -e "import { redactSensitiveText } from './src/adapters/opencode/policy.ts'; import { createOpenCodeTools } from './src/adapters/opencode/tools.ts'; const sentinel = 'super-' + 'secret-token'; const redacted = redactSensitiveText('Authorization: Bearer ' + sentinel + '\nTDAI_GATEWAY_API_KEY=' + sentinel + '\nBearer ' + sentinel); const client = { recall: async () => ({ context: 'Large memory Bearer ' + sentinel + ' ' + 'x'.repeat(240), strategy: 'hybrid', memory_count: 1 }), searchMemories: async () => ({ results: '', total: 0, strategy: 'hybrid' }), searchConversations: async () => ({ results: '', total: 0 }) }; const tool = createOpenCodeTools({ client, context: { sessionKey: 'opencode:aaaaaaaaaaaaaaaa:bbbbbbbbbbbbbbbb:evidence:local' }, recallMaxTotalChars: 120 })[0]; const output = await tool.execute({ query: 'redaction evidence' }); const combined = redacted + '\n' + output; if (combined.includes(sentinel)) throw new Error('raw sentinel leaked'); if (!combined.includes('Bearer [redacted]')) throw new Error('missing bearer redaction'); if (!output.includes('[truncated]')) throw new Error('large recall was not bounded'); console.log(JSON.stringify({ redaction: 'passed', rawSentinelPresent: false, bearerRedacted: combined.includes('Bearer [redacted]'), boundedRecall: output.includes('[truncated]') }, null, 2));"
+
+Sanitized output:
+{
+  "redaction": "passed",
+  "rawSentinelPresent": false,
+  "bearerRedacted": true,
+  "boundedRecall": true
+}
+
+Result: exit code 0. Bearer values, env-style API key values, and large recall output were redacted/bounded without printing the raw token sentinel.

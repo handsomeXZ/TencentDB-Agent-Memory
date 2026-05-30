@@ -1,0 +1,74 @@
+Task 19 full-stack integration sweep evidence
+Timestamp: 2026-05-30 05:26:13 +08:00
+Workspace: D:\ForkWorkSpace\TencentDB-Agent-Memory
+Node observed during build: v22.17.0
+
+Secret handling
+- Did not read docker/standalone/.env.local or any other secret file.
+- Checked only the current process environment for TDAI_GATEWAY_API_KEY presence.
+- Current process environment result: TDAI_GATEWAY_API_KEY=missing.
+- Real final-acceptance Gateway smoke was not run because no API key was present in the current process environment.
+
+Command: npm run build
+Result: PASS, exit code 0.
+Sanitized summary:
+- tsdown completed both entries.
+- Built root OpenClaw entry: dist/index.mjs and dist/l1-reader-B6GBuxTv.mjs.
+- Built OpenCode server entry: dist/opencode/server.js and dist/opencode/server.d.ts.
+- Build scripts completed: migrate-sqlite-to-tcvdb, export-tencent-vdb, read-local-memory.
+- Non-blocking warning observed: tsdown says Node.js v22.17.0 is deprecated and recommends v22.18.0 or later.
+
+Command: npm test
+Result: PASS, exit code 0.
+Sanitized summary:
+- Vitest reported 8 test files passed.
+- Vitest reported 74 tests passed.
+- Duration reported by Vitest: 655ms.
+
+Command: npm pack --dry-run
+Result: PASS, exit code 0.
+Sanitized summary:
+- prepack re-ran npm run build successfully.
+- npm dry-run produced tencentdb-agent-memory-memory-tencentdb-0.3.6.tgz.
+- Tarball summary: package size 710.9 kB, unpacked size 2.7 MB, total files 153.
+- Confirmed OpenCode server entry present in dry-run output: dist/opencode/server.js.
+- Confirmed OpenCode server types present in dry-run output: dist/opencode/server.d.ts.
+- Confirmed OpenCode user docs present in dry-run output: docs/opencode-memory-plugin.md.
+- Confirmed OpenCode compatibility docs present in dry-run output: docs/opencode-plugin-compatibility.md.
+- Confirmed smoke script present in dry-run output: scripts/smoke-opencode-gateway.ts.
+
+Command: node --input-type=module -e "await import('./dist/opencode/server.js'); console.log('import-ok')"
+Result: PASS, exit code 0.
+Sanitized summary:
+- Output: import-ok.
+- Interpretation: built local OpenCode server entry imports without requiring a running Gateway or API key at module import time.
+
+Command: npm run smoke:opencode-gateway
+Result: PASS/SKIP-SAFE, exit code 0.
+Sanitized summary:
+- Mode: default.
+- Base URL: http://127.0.0.1:8420.
+- Timeout: 10000ms.
+- GET /health was called unauthenticated.
+- Health response was reachable and ok: version=0.1.0, vectorStore=true, embeddingService=true.
+- Protected routes were skipped before /capture, /recall, /search/memories, and /session/end because TDAI_GATEWAY_API_KEY is missing.
+- Interpretation: default smoke remains CI-safe and does not attempt protected requests without an API key.
+
+Command: npx tsx -e "... GatewayHttpClient recall without apiKey ..."
+Result: PASS, exit code 0 on second attempt.
+Sanitized summary:
+- First attempt used top-level await and failed with a tsx/esbuild CJS eval limitation; no Gateway request was made.
+- Second attempt wrapped the check in async function main().
+- Output: Gateway API key is required for protected endpoint.
+- Interpretation: protected Gateway client requests still fail fast when no API key is configured.
+
+Command: final-acceptance Gateway smoke
+Result: NOT RUN.
+Reason:
+- TDAI_GATEWAY_API_KEY was not present in the current process environment.
+- Per task constraint, no secret files were inspected to obtain it.
+- Final verification cannot start from this evidence alone without a user waiver or a rerun with TDAI_GATEWAY_API_KEY already present.
+
+Code diagnostics
+- No TypeScript or YAML files were modified during Task 19.
+- lsp_diagnostics was therefore not required for modified TypeScript/YAML files.

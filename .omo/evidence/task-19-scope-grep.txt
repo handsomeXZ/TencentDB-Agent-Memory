@@ -1,0 +1,59 @@
+Task 19 scope grep evidence
+Timestamp: 2026-05-30 05:26:13 +08:00
+
+Files searched for v1 scope guardrails
+- src/opencode
+- src/adapters/opencode
+- docs/opencode-memory-plugin.md
+- docs/opencode-plugin-compatibility.md
+- scripts/smoke-opencode-gateway.ts
+- package.json
+- .github/workflows/pr-ci.yml
+
+Command: rg -n "tdai_memory_recall|tdai_memory_search|tdai_conversation_search|admin|debug|seed|delete|update|stats|reset" ...
+Relevant matches and interpretation:
+- docs/opencode-memory-plugin.md lists exactly:
+  - tdai_memory_recall
+  - tdai_memory_search
+  - tdai_conversation_search
+- docs/opencode-memory-plugin.md states: "No admin, debug, seed, delete, update, stats, or reset tools are part of OpenCode v1."
+- docs/opencode-memory-plugin.md lists out-of-scope seed/delete/update/debug/stats/data mutation tools.
+- docs/opencode-plugin-compatibility.md says the OpenCode server entry should register exactly the planned v1 memory tools: tdai_memory_recall, tdai_memory_search, and tdai_conversation_search.
+- src/adapters/opencode/tools.ts defines tool names only at:
+  - name: "tdai_memory_recall"
+  - name: "tdai_memory_search"
+  - name: "tdai_conversation_search"
+  - getOpenCodeV1ToolNames() returns ["tdai_memory_recall", "tdai_memory_search", "tdai_conversation_search"].
+- src/opencode/server.ts builds the tool map from getOpenCodeV1ToolNames().
+- Test files include negative assertions for seed/delete/update/stats/debug/admin names; these are tests only, not runtime registrations.
+
+Command: rg -n "getOpenCodeV1ToolNames|tdai_memory_recall|tdai_memory_search|tdai_conversation_search" src/opencode src/adapters/opencode
+Interpretation:
+- Runtime registration path uses src/opencode/server.ts -> getOpenCodeV1ToolNames() -> src/adapters/opencode/tools.ts.
+- The authoritative runtime v1 tool surface remains exactly tdai_memory_recall, tdai_memory_search, and tdai_conversation_search.
+
+Command: rg -n "short[- ]term|short term|offload|compression|pre[- ]model|automatic recall|Docker|Gateway lifecycle|start|stop|restart|supervise|manage" ...
+Relevant matches and interpretation:
+- scripts/smoke-opencode-gateway.ts help text states the command only calls an already deployed Gateway and never starts, stops, configures, or supervises Docker or the Gateway.
+- docs/opencode-memory-plugin.md states the plugin is only an HTTP client and does not start, stop, install, restart, or manage Docker or Gateway lifecycle.
+- docs/opencode-memory-plugin.md states OpenCode v1 does not implement short term context offload or compression.
+- docs/opencode-memory-plugin.md out-of-scope section lists short term context offload/compression, Docker management, Gateway installation/startup/shutdown/restart/supervision, and automatic recall injection promises.
+- docs/opencode-plugin-compatibility.md states pre-model automatic recall injection is not verified and automatic pre-model recall injection is disabled for the first implementation.
+- src/adapters/opencode/recall-lifecycle.test.ts verifies automatic pre-model recall injection remains disabled and explicit tool fallback remains available.
+
+Command: rg -n "TODO|FIXME" src/opencode src/adapters/opencode
+Result: no matches.
+Interpretation:
+- No unresolved TODO/FIXME markers remain in OpenCode-specific implementation files.
+
+Server entry export note
+- Command attempted: node --input-type=module -e "import('./dist/opencode/server.js').then((module) => { const names = module.getOpenCodeV1ToolNames ? module.getOpenCodeV1ToolNames() : undefined; console.log(names ? JSON.stringify(names) : 'getOpenCodeV1ToolNames-not-exported-from-server-entry'); })"
+- Result: getOpenCodeV1ToolNames-not-exported-from-server-entry.
+- Interpretation: the built server entry imports correctly, but getOpenCodeV1ToolNames is not exported from the server entry. The exact tool surface was therefore confirmed from the runtime server source and adapter source/tests, not by importing that helper from dist/opencode/server.js.
+
+Raw token leakage check
+- Performed after generating Task 19 evidence.
+- Strict token-pattern commands all returned no matches:
+  - rg -n "sk-[A-Za-z0-9]{20,}" ".omo\evidence"
+  - rg -n "Bearer [A-Za-z0-9._~+/-]{16,}" ".omo\evidence"
+  - rg -n "TDAI_GATEWAY_API_KEY=[A-Za-z0-9._~+/-]{16,}" ".omo\evidence"

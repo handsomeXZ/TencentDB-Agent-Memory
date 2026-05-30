@@ -1,0 +1,14 @@
+Task 18 unauthorized degraded-mode evidence
+
+Command:
+node --import tsx/esm -e "import { GatewayHttpClient } from './src/gateway-client/client.ts'; import { createOpenCodeTools } from './src/adapters/opencode/tools.ts'; const sentinel = 'super-' + 'secret-token'; let calls = 0; const fetchMock = async (url) => { calls += 1; return new Response(JSON.stringify({ error: 'Unauthorized Bearer ' + sentinel }), { status: 401, headers: { 'content-type': 'application/json' } }); }; const client = new GatewayHttpClient({ baseUrl: 'http://gateway.test:8420', apiKey: sentinel, timeoutMs: 1000, fetch: fetchMock }); const tool = createOpenCodeTools({ client, context: { sessionKey: 'opencode:aaaaaaaaaaaaaaaa:bbbbbbbbbbbbbbbb:evidence:local' }, recallMaxTotalChars: 1000 })[0]; const output = await tool.execute({ query: 'auth evidence' }); if (output.includes(sentinel)) throw new Error('raw sentinel leaked'); if (!output.includes('HTTP 401')) throw new Error('missing 401 context'); if (!output.includes('Bearer [redacted]')) throw new Error('missing bearer redaction'); if (calls !== 1) throw new Error('unexpected retry count ' + calls); console.log(JSON.stringify({ unauthorizedDegraded: true, httpContext: 'HTTP 401', rawSentinelPresent: false, protectedCalls: calls }, null, 2));"
+
+Sanitized output:
+{
+  "unauthorizedDegraded": true,
+  "httpContext": "HTTP 401",
+  "rawSentinelPresent": false,
+  "protectedCalls": 1
+}
+
+Result: exit code 0. A mocked protected request returned 401, the OpenCode tool degraded instead of throwing, the raw token sentinel was not printed, and no retry was attempted.
