@@ -17,3 +17,29 @@ export type { OpenClawHostAdapterOptions, OpenClawLLMRunnerFactoryOptions } from
 // Standalone adapter
 export { StandaloneHostAdapter, StandaloneLLMRunner, StandaloneLLMRunnerFactory } from "./standalone/index.js";
 export type { StandaloneHostAdapterOptions, StandaloneLLMConfig, StandaloneLLMRunnerFactoryOptions } from "./standalone/index.js";
+
+// OpenCode adapter helpers
+export {
+  OPEN_CODE_PLUGIN_DEFAULTS,
+  OpenCodeHostAdapter,
+  OpenCodePluginConfigError,
+  parseOpenCodePluginConfig,
+  toLoggableOpenCodePluginConfig,
+} from "./opencode/index.js";
+export type {
+  OpenCodeContextInjectionRequest,
+  OpenCodeDisposer,
+  OpenCodeEventHandler,
+  OpenCodeHostAdapterOptions,
+  OpenCodeHostCapabilities,
+  OpenCodeHostIdentity,
+  OpenCodePluginConfig,
+  OpenCodePluginConfigInput,
+  OpenCodePluginLoggableConfig,
+  OpenCodeProjectLike,
+  OpenCodeRuntimeLike,
+  OpenCodeSessionLike,
+  OpenCodeToolDefinitionLike,
+  OpenCodeUserLike,
+  OpenCodeWorkspaceLike,
+} from "./opencode/index.js";

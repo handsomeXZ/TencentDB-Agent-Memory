@@ -34,6 +34,7 @@ import { registerMemoryTdaiCli } from "./src/cli/index.js";
 import { initDataDirectories, resetStores } from "./src/utils/pipeline-factory.js";
 import { getOrCreateInstanceId, initReporter, report, resetReporter } from "./src/core/report/reporter.js";
 import { ensureL2L3Local } from "./src/core/profile/profile-sync.js";
+import openCodeServerPlugin from "./src/opencode/server.js";
 
 // Core abstractions (host-neutral)
 import { OpenClawHostAdapter } from "./src/adapters/openclaw/host-adapter.js";
@@ -128,7 +129,7 @@ function sweepStaleCaches(): void {
   }
 }
 
-export default function register(api: OpenClawPluginApi) {
+export function register(api: OpenClawPluginApi) {
   // ─── CLI metadata mode: register CLI commands only, skip all runtime init ───
   // In this mode, runtime is `{} as PluginRuntime` (empty object).
   // OpenClaw calls this to discover CLI subcommands without starting the full plugin.
@@ -860,3 +861,5 @@ export default function register(api: OpenClawPluginApi) {
     `startTimestamp=${pluginStartTimestamp} (${new Date(pluginStartTimestamp).toISOString()})`,
   );
 }
+
+export default openCodeServerPlugin;

@@ -13,6 +13,10 @@
     ".": {
       "import": "./dist/index.mjs",
       "default": "./dist/index.mjs"
+    },
+    "./server": {
+      "types": "./dist/opencode/server.d.ts",
+      "import": "./dist/opencode/server.js"
     }
   },
   "scripts": {
@@ -26,6 +30,7 @@
     "export-tencent-vdb": "node ./bin/export-tencent-vdb.mjs",
     "build:read-local-memory": "tsc --project scripts/read-local-memory/tsconfig.json",
     "read-local-memory": "node ./bin/read-local-memory.mjs",
+    "smoke:opencode-gateway": "tsx scripts/smoke-opencode-gateway.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
@@ -38,9 +43,12 @@
     "scripts/migrate-sqlite-to-tcvdb/dist/",
     "scripts/export-tencent-vdb/dist/",
     "scripts/read-local-memory/dist/",
+    "scripts/smoke-opencode-gateway.ts",
     "scripts/memory-tencentdb-ctl.sh",
     "scripts/install_hermes_memory_tencentdb.sh",
     "scripts/README.memory-tencentdb-ctl.md",
+    "docs/opencode-memory-plugin.md",
+    "docs/opencode-plugin-compatibility.md",
     "src",
     "scripts/openclaw-after-tool-call-messages.patch.sh",
     "scripts/setup-offload.sh",
@@ -49,6 +57,10 @@
     "README.md",
     "CHANGELOG.md",
     "LICENSE",
+    "!**/tests/**",
+    "!**/__tests__/**",
+    "!**/*.test.*",
+    "!**/*.spec.*",
     "!src/**/*.test.ts",
     "!src/**/*.spec.ts",
     "!src/**/__tests__/"

@@ -10,26 +10,50 @@ function collectExternalDependencies(): string[] {
   ];
 }
 
-export default defineConfig({
-  entry: ["./index.ts"],
-  outDir: "./dist",
-  format: "esm",
-  platform: "node",
-  clean: true,
-  fixedExtension: true,
-  dts: false,
-  sourcemap: false,
-  deps: {
-    neverBundle: (id) => {
-      // openclaw SDK — always external
-      if (id === "openclaw" || id.startsWith("openclaw/")) return true;
-      // node: builtins
-      if (id.startsWith("node:")) return true;
-      // all declared dependencies
-      for (const dep of collectExternalDependencies()) {
-        if (id === dep || id.startsWith(`${dep}/`)) return true;
-      }
-      return false;
+export default defineConfig([
+  {
+    entry: ["./index.ts"],
+    outDir: "./dist",
+    format: "esm",
+    platform: "node",
+    clean: true,
+    fixedExtension: true,
+    dts: false,
+    sourcemap: false,
+    deps: {
+      neverBundle: (id) => {
+        // openclaw SDK — always external
+        if (id === "openclaw" || id.startsWith("openclaw/")) return true;
+        // node: builtins
+        if (id.startsWith("node:")) return true;
+        // all declared dependencies
+        for (const dep of collectExternalDependencies()) {
+          if (id === dep || id.startsWith(`${dep}/`)) return true;
+        }
+        return false;
+      },
     },
   },
-});
+  {
+    entry: {
+      "opencode/server": "./src/opencode/server.ts",
+    },
+    outDir: "./dist",
+    format: "esm",
+    platform: "node",
+    clean: false,
+    fixedExtension: false,
+    dts: true,
+    sourcemap: false,
+    deps: {
+      neverBundle: (id) => {
+        if (id === "openclaw" || id.startsWith("openclaw/")) return true;
+        if (id.startsWith("node:")) return true;
+        for (const dep of collectExternalDependencies()) {
+          if (id === dep || id.startsWith(`${dep}/`)) return true;
+        }
+        return false;
+      },
+    },
+  },
+]);
