@@ -1,0 +1,20 @@
+Task 6 Gateway client contract verification
+
+Command:
+npx vitest run src/gateway-client/client.contract.test.ts --reporter=default
+
+Observed result:
+- src/gateway-client/client.contract.test.ts passed
+- 1 test file passed
+- 8 tests passed
+- Verified GET /health, protected POST routes, baseUrl normalization, missing API key fail-fast, 401 handling, 5xx handling, non-JSON handling, and timeout behavior
+- No raw API key tokens were printed in the test output
+
+Manual driver verification:
+node --import tsx/esm -e "import { GatewayHttpClient, GatewayHttpClientError } from './src/gateway-client/client.ts'; const calls = []; const fetchMock = async (input, init) => { calls.push({ input: String(input), method: init?.method, auth: new Headers(init?.headers).get('authorization'), body: init?.body ? JSON.parse(String(init.body)) : undefined }); return new Response(JSON.stringify(input.toString().endsWith('/health') ? { status: 'ok', version: 'manual', uptime: 1, stores: { vectorStore: true, embeddingService: false } } : { context: 'manual', memory_count: 0 }), { status: 200, headers: { 'Content-Type': 'application/json' } }); }; const client = new GatewayHttpClient({ baseUrl: 'https://gateway.example/nested/', apiKey: 'redacted', timeoutMs: 1000, fetch: fetchMock }); await client.health(); await client.recall({ query: 'q', session_key: 's' }); const missing = new GatewayHttpClient({ baseUrl: 'https://gateway.example/nested', fetch: fetchMock }); let failedFast = false; try { await missing.capture({ user_content: 'u', assistant_content: 'a', session_key: 's' }); } catch (error) { failedFast = error instanceof GatewayHttpClientError && error.kind === 'config'; } console.log(JSON.stringify({ calls, failedFast }, null, 2));"
+
+Observed result:
+- health() called /health without Authorization
+- recall() called /recall with Bearer auth and JSON body
+- Missing API key failed fast before any protected network request
+- Nested base path remained intact in the composed request URLs

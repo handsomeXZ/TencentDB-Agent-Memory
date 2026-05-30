@@ -1,0 +1,19 @@
+Task 8 evidence: tdai_memory_search contract
+
+- Test file: src/adapters/opencode/tools.test.ts
+- Verified tdai_memory_search sends:
+  - query: trimmed user query
+  - limit: explicit value when valid
+  - limit: default OpenCode recall maxResults when absent or invalid
+- Verified memory search output contract:
+  - readable header with returned strategy
+  - readable formatted body, not raw JSON
+  - clean no-result message without error text
+  - empty query rejected before gateway call
+
+Verification command:
+`npx vitest run src/adapters/opencode/tools.test.ts`
+
+Observed result:
+- 1 test file passed
+- 13 tests passed

@@ -1,0 +1,21 @@
+Task 8 evidence: tdai_conversation_search degraded error contract
+
+- Test file: src/adapters/opencode/tools.test.ts
+- Verified tdai_conversation_search sends:
+  - query: trimmed user query
+  - limit: explicit value or default fallback
+  - session_key: current scoped session key
+- Verified degraded behavior on Gateway error:
+  - returns user-readable unavailability message
+  - includes sanitized HTTP error detail
+  - redacts Bearer token material
+  - redacts API-key-like values
+  - does not leak raw secrets in output
+- Verified clean no-result behavior and empty-query rejection
+
+Verification command:
+`npx vitest run src/adapters/opencode/tools.test.ts`
+
+Observed result:
+- 1 test file passed
+- 13 tests passed

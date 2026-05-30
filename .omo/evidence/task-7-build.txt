@@ -1,0 +1,13 @@
+Task 7 build and export verification
+
+Command: npm run build
+Result: PASS
+Summary:
+- build:plugin completed through tsdown for ./index.ts and ./src/opencode/server.ts.
+- build:scripts completed migrate-sqlite-to-tcvdb, export-tencent-vdb, and read-local-memory TypeScript builds.
+- Existing warning: tsdown reports Node.js v22.17.0 is deprecated and recommends v22.18.0 or later; build exit remained successful.
+
+Command: npx tsx -e "import { OpenClawHostAdapter, OpenCodeHostAdapter } from './src/adapters/index.ts'; ..."
+Result: PASS
+Observed:
+- Barrel export resolved both existing OpenClawHostAdapter and new OpenCodeHostAdapter constructors.

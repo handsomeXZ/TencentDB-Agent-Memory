@@ -1,0 +1,10 @@
+Task 6 non-JSON response verification
+
+Command:
+npx vitest run src/gateway-client/client.contract.test.ts --testNamePattern "non-JSON" --reporter=tap
+
+Observed result:
+- The focused non-JSON contract assertion passed
+- The client rejected a text/plain response as non-JSON
+- The thrown error remained redacted and did not include any raw API key material
+- The full contract suite also remained green when this case ran

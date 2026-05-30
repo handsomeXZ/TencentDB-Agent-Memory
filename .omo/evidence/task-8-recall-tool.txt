@@ -1,0 +1,23 @@
+Task 8 evidence: tdai_memory_recall contract
+
+- Test file: src/adapters/opencode/tools.test.ts
+- Verified tool names are exactly:
+  - tdai_memory_recall
+  - tdai_memory_search
+  - tdai_conversation_search
+- Verified tdai_memory_recall sends:
+  - query: trimmed user query
+  - session_key: current scoped session key
+- Verified recall output contract:
+  - human-readable header with strategy
+  - source count line
+  - empty-context fallback message
+  - bounded output with [truncated]
+  - token redaction for Bearer tokens and API-key-like values
+
+Verification command:
+`npx vitest run src/adapters/opencode/tools.test.ts`
+
+Observed result:
+- 1 test file passed
+- 13 tests passed

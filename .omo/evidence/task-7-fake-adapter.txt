@@ -1,0 +1,15 @@
+Task 7 fake OpenCode adapter verification
+
+Command: npm run test -- src/adapters/opencode/host-adapter.test.ts
+Result: PASS
+Summary:
+- Vitest ran src/adapters/opencode/host-adapter.test.ts.
+- Test Files: 1 passed (1).
+- Tests: 4 passed (4).
+
+Manual surface driver:
+Command: npx tsx -e "import { OpenCodeHostAdapter } from './src/adapters/opencode/host-adapter.ts'; ..."
+Result: PASS
+Observed:
+- Generated session key matched opencode:<workspaceHash>:<projectHash>:manual-session:<userHash>.
+- Capability flags were {"supportsEventSubscription":false,"supportsToolRegistration":false,"supportsLifecycleDispose":true,"supportsContextInjection":false,"supportsPreModelRecallInjection":false}.

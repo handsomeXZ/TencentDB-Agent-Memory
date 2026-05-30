@@ -1,0 +1,21 @@
+Task 9 recall lifecycle timeout/degraded evidence
+
+Command:
+  npx vitest run src/adapters/opencode/recall-lifecycle.test.ts -t "timeout"
+
+Sanitized result:
+  RUN v4.1.7 D:/ForkWorkSpace/TencentDB-Agent-Memory
+  Test Files: 1 passed (1)
+  Tests: 1 passed, 5 skipped (6)
+  Duration: 257ms
+
+Contract covered:
+  - Fake Gateway recall rejected with a typed timeout error.
+  - Explicit tdai_memory_recall returned exactly one degraded user-visible result instead of throwing.
+  - Host flow remained non-blocking because the tool promise resolved with sanitized degraded output.
+  - No real Gateway, Docker, API key, Bearer token, system prompt, or shell environment was used or printed.
+
+Related verification also completed:
+  - npx vitest run src/adapters/opencode/recall-lifecycle.test.ts: 1 file passed, 6 tests passed.
+  - npm test: 7 files passed, 53 tests passed.
+  - npm run build: exited successfully; tsdown emitted the known local Node v22.17.0 deprecation warning only.
