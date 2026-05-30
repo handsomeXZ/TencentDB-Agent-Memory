@@ -1,0 +1,48 @@
+Task 16 real independent Gateway loop evidence
+
+Environment check:
+  TDAI_GATEWAY_API_KEY=missing
+
+Observed Gateway availability during default smoke:
+  [smoke] GET /health unauthenticated
+  [smoke] health status=ok version=0.1.0 vectorStore=true embeddingService=true
+
+Real final-acceptance loop status:
+  Pending user-provided TDAI_GATEWAY_API_KEY in the shell environment.
+
+Strict-mode unavailable-env check:
+  Command: $env:TDAI_GATEWAY_API_KEY=''; npm run smoke:opencode-gateway -- --final-acceptance; "exit_code=$LASTEXITCODE"
+  Output:
+    npm warn Unknown cli config "--final-acceptance". This will stop working in the next major version of npm.
+    [smoke] mode=final-acceptance baseUrl=http://127.0.0.1:8420 timeoutMs=10000
+    [smoke] GET /health unauthenticated
+    [smoke] health status=ok version=0.1.0 vectorStore=true embeddingService=true
+    [smoke] FAIL TDAI_GATEWAY_API_KEY is required for protected /capture, /recall, /search/memories, and /session/end routes
+    exit_code=1
+
+  No-warning equivalent checked directly through the script:
+    Command: $env:TDAI_GATEWAY_API_KEY=''; npx tsx scripts/smoke-opencode-gateway.ts --final-acceptance; "exit_code=$LASTEXITCODE"
+    Output:
+      [smoke] mode=final-acceptance baseUrl=http://127.0.0.1:8420 timeoutMs=10000
+      [smoke] GET /health unauthenticated
+      [smoke] health status=ok version=0.1.0 vectorStore=true embeddingService=true
+      [smoke] FAIL TDAI_GATEWAY_API_KEY is required for protected /capture, /recall, /search/memories, and /session/end routes
+      exit_code=1
+
+  No-warning package-script equivalent:
+    Command: $env:TDAI_GATEWAY_API_KEY=''; $env:TDAI_GATEWAY_SMOKE_MODE='final-acceptance'; npm run smoke:opencode-gateway; "exit_code=$LASTEXITCODE"
+    Output:
+      [smoke] mode=final-acceptance baseUrl=http://127.0.0.1:8420 timeoutMs=10000
+      [smoke] GET /health unauthenticated
+      [smoke] health status=ok version=0.1.0 vectorStore=true embeddingService=true
+      [smoke] FAIL TDAI_GATEWAY_API_KEY is required for protected /capture, /recall, /search/memories, and /session/end routes
+      exit_code=1
+
+Reason:
+  The local Gateway health endpoint was reachable, but TDAI_GATEWAY_API_KEY was not present in the process environment. Per Task 16 constraints, the final-acceptance loop must only run against a real Gateway with the real API key available, and secret files such as docker/standalone/.env.local must not be read.
+
+Expected command once a human provides the Gateway API key:
+  npm run smoke:opencode-gateway -- --final-acceptance
+
+Sanitization:
+  No raw TDAI_GATEWAY_API_KEY or Bearer token material is present in this evidence file.

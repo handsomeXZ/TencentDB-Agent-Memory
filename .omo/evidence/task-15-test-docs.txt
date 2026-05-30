@@ -1,0 +1,9 @@
+Scenario: Test commands documented
+
+COMMAND: rg -n "npm run build|npm test|npm pack --dry-run|smoke:opencode-gateway" "docs/opencode-memory-plugin.md"
+
+OUTPUT:
+166:npm run build
+167:npm test
+168:npm pack --dry-run
+176:npm run smoke:opencode-gateway

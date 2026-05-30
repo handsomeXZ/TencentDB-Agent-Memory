@@ -1,0 +1,59 @@
+Task 16 final-acceptance smoke rerun evidence
+
+Code change summary:
+  After authenticated /capture, the smoke now treats /recall and /search/memories as alternatives for the read side of the acceptance loop. If /recall fails or times out, it attempts authenticated /search/memories before failing the loop. /session/end still runs in finally.
+
+Strict real Gateway rerun with docker/standalone/.env.local key loaded into process env without printing it:
+  Command shape:
+    Read only the TDAI_GATEWAY_API_KEY assignment from docker/standalone/.env.local into process env, set TDAI_GATEWAY_SMOKE_MODE=final-acceptance, then run npm run smoke:opencode-gateway.
+  Sanitized output:
+    [smoke] mode=final-acceptance baseUrl=http://127.0.0.1:8420 timeoutMs=10000
+    [smoke] GET /health unauthenticated
+    [smoke] health status=ok version=0.1.0 vectorStore=true embeddingService=true
+    [smoke] using unique session_key=opencode-smoke:2026-05-30T02-38-19-912Z:bdc15f22-dedb-439d-8735-97e5a5c43c4a
+    [smoke] POST /capture with Bearer [redacted]
+    [smoke] capture ok l0_recorded=2 scheduler_notified=true
+    [smoke] POST /recall with Bearer [redacted]
+    [smoke] recall ok context_chars=0 memory_count=0 strategy=n/a
+    [smoke] POST /session/end with Bearer [redacted]
+    [smoke] session end ok flushed=true
+    [smoke] PASS independent Gateway smoke loop completed
+    exit_code=0
+
+Default no-secret smoke check:
+  Command: clear TDAI_GATEWAY_API_KEY and TDAI_GATEWAY_SMOKE_MODE, then run npm run smoke:opencode-gateway.
+  Sanitized output:
+    [smoke] mode=default baseUrl=http://127.0.0.1:8420 timeoutMs=10000
+    [smoke] GET /health unauthenticated
+    [smoke] health status=ok version=0.1.0 vectorStore=true embeddingService=true
+    [smoke] SKIP TDAI_GATEWAY_API_KEY is required for protected /capture, /recall, /search/memories, and /session/end routes
+    exit_code=0
+
+Command-level fallback checks with temporary local mock HTTP process:
+  Recall timeout then search fallback succeeds:
+    [smoke] POST /recall with Bearer [redacted]
+    [smoke] recall failed; attempting /search/memories fallback: Gateway POST /recall timed out after 200ms kind=timeout
+    [smoke] POST /search/memories with Bearer [redacted]
+    [smoke] search ok total=1 strategy=mock results_chars=11
+    [smoke] POST /session/end with Bearer [redacted]
+    [smoke] session end ok flushed=true
+    [smoke] PASS independent Gateway smoke loop completed
+    mock_session_end_calls=1
+    exit_code=0
+
+  Recall and search both fail, with session end still called:
+    [smoke] POST /recall with Bearer [redacted]
+    [smoke] recall failed; attempting /search/memories fallback: Gateway POST /recall failed with HTTP 500: recall unavailable kind=http status=500
+    [smoke] POST /search/memories with Bearer [redacted]
+    [smoke] POST /session/end with Bearer [redacted]
+    [smoke] session end ok flushed=true
+    [smoke] FAIL real Gateway loop failed: both /recall and /search/memories failed; recall=Gateway POST /recall failed with HTTP 500: recall unavailable kind=http status=500; search=Gateway POST /search/memories failed with HTTP 500: search unavailable kind=http status=500
+    mock_session_end_calls=1
+    exit_code=1
+
+Build/test verification:
+  npm test: 8 test files passed, 74 tests passed.
+  npm run build: passed; tsdown repeated the known local Node v22.17.0 deprecation warning.
+
+Sanitization:
+  No raw TDAI_GATEWAY_API_KEY value, raw Bearer token, or docker/standalone/.env.local content is present in this evidence file.

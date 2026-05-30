@@ -1,0 +1,44 @@
+Task 14 OpenCode config and package validation
+
+Sanitized npm plugin config snippet:
+
+```jsonc
+{
+  "plugin": [
+    [
+      "@tencentdb-agent-memory/memory-tencentdb",
+      {
+        "gatewayUrl": "http://127.0.0.1:8420",
+        "timeoutMs": 5000,
+        "capture": { "enabled": true },
+        "recall": {
+          "enabled": true,
+          "maxResults": 5,
+          "maxTotalChars": 6000
+        },
+        "tools": { "enabled": true },
+        "redaction": { "enabled": true }
+      }
+    ]
+  ]
+}
+```
+
+API key guidance:
+- Preferred: set TDAI_GATEWAY_API_KEY in the environment that launches OpenCode.
+- Local-only fallback: set apiKey in the tuple config with a placeholder, never a committed secret.
+- Missing both values fails fast during plugin config parsing.
+
+Sanitized validation results:
+- npm run build: passed
+- npm test: passed, 8 files and 59 tests
+- npm pack --dry-run: passed
+- node import smoke: passed with output import-ok
+
+Confirmed pack artifacts include:
+- dist/opencode/server.js
+- dist/opencode/server.d.ts
+- docs/opencode-memory-plugin.md
+- docs/opencode-plugin-compatibility.md
+
+Confirmed pack excludes test files via package.json files allowlist and negations.

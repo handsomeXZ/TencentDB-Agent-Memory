@@ -1,0 +1,18 @@
+Task 14 path-safe OpenCode docs verification
+
+Repo: <repo-root>
+Date: 2026-05-30
+
+Checks performed:
+1. Verified OpenCode user doc uses repo-relative placeholders such as <repo-root> and <project> for local plugin development.
+2. Verified tracked docs do not require global OpenCode config mutation for validation.
+3. Verified tracked docs do not contain machine-specific absolute paths.
+
+Sanitized grep result:
+- No matches for Windows drive paths, raw user-home paths, or ~/.config/opencode references in docs/*.md after doc cleanup.
+
+Relevant doc behavior documented:
+- Local dev loading uses <project>/.opencode/plugins/memory-tencentdb.
+- npm loading uses package name @tencentdb-agent-memory/memory-tencentdb in opencode.json.
+- Protected Gateway calls require TDAI_GATEWAY_API_KEY or explicit apiKey.
+- Importing dist/opencode/server.js does not require a running Gateway.

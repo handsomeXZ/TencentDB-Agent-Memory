@@ -1,0 +1,21 @@
+Scenario: Scope guardrails visible
+
+COMMAND: rg -n "does not start|does not stop|must already be running|manage Docker|manage the Gateway|API key|short term|short-term|tdai_memory_recall|tdai_memory_search|tdai_conversation_search|No admin|no admin|delete|update|debug|stats" "docs/opencode-memory-plugin.md"
+
+OUTPUT:
+7:The plugin is only an HTTP client. It does not start, stop, install, restart, or manage Docker. It does not start or stop the Gateway. Your Gateway must already be running before OpenCode loads the plugin.
+9:OpenCode v1 does not implement short term context offload or compression. v1 covers long term memory capture, explicit recall, explicit search, and session end flush only.
+26:3. A non empty Gateway API key configured on the Gateway side with `TDAI_GATEWAY_API_KEY`.
+27:4. The same API key available to the OpenCode plugin through plugin config `apiKey` or env var `TDAI_GATEWAY_API_KEY`.
+34:| `TDAI_GATEWAY_API_KEY` | Yes | none | Mandatory API key for protected OpenCode plugin Gateway calls |
+37:The OpenCode plugin requires an API key for protected Gateway calls. If `apiKey` is missing from plugin config, the plugin falls back to `TDAI_GATEWAY_API_KEY`. If both are absent, config validation fails fast.
+39:`GET /health` is unauthenticated on the Gateway. Protected routes still require Bearer auth, and the plugin must be configured with an API key.
+98:- The Gateway must already be running before the plugin is used.
+116:1. `tdai_memory_recall`
+117:2. `tdai_memory_search`
+118:3. `tdai_conversation_search`
+120:No admin, debug, seed, delete, update, stats, or reset tools are part of OpenCode v1.
+158:- Seed, delete, update, debug, stats, or data mutation tools.
+183:### Plugin fails to load with an API key error
+199:Fix: use `tdai_memory_recall`, `tdai_memory_search`, and `tdai_conversation_search` explicitly until later tasks finish the runtime lifecycle wiring.
+205:Fix: start the independent Gateway separately, verify `curl http://127.0.0.1:8420/health`, then load OpenCode. The plugin does not start or stop the Gateway.

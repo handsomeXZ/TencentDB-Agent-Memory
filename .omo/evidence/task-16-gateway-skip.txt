@@ -1,0 +1,19 @@
+Task 16 Gateway smoke default/skip evidence
+
+Command:
+  $env:TDAI_GATEWAY_API_KEY=''; npm run smoke:opencode-gateway; "exit_code=$LASTEXITCODE"
+
+Sanitized output:
+  > @tencentdb-agent-memory/memory-tencentdb@0.3.6 smoke:opencode-gateway
+  > tsx scripts/smoke-opencode-gateway.ts
+
+  [smoke] mode=default baseUrl=http://127.0.0.1:8420 timeoutMs=10000
+  [smoke] GET /health unauthenticated
+  [smoke] health status=ok version=0.1.0 vectorStore=true embeddingService=true
+  [smoke] SKIP TDAI_GATEWAY_API_KEY is required for protected /capture, /recall, /search/memories, and /session/end routes
+  exit_code=0
+
+Notes:
+  - GET /health ran before any protected route.
+  - The smoke script did not start, stop, restart, configure, or inspect Docker/Gateway state.
+  - No raw TDAI_GATEWAY_API_KEY or Bearer token material was printed.
