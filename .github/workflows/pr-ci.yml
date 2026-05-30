@@ -32,7 +32,37 @@ jobs:
         if: steps.cache-deps.outputs.cache-hit != 'true'
         run: npm install --ignore-scripts
 
-  # ── 2. Pack validation ─────────────────────────────────────
+  # ── 2. Standard command verification ───────────────────────
+  verify:
+    name: Verify
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Restore node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: deps-${{ runner.os }}-${{ hashFiles('package.json') }}
+
+      - name: npm run build
+        run: npm run build
+
+      - name: npm test
+        run: npm test
+
+      - name: OpenCode server import smoke
+        run: node --input-type=module -e "await import('./dist/opencode/server.js'); console.log('import-ok')"
+
+      - name: CI-safe Gateway smoke (no secret required)
+        run: npm run smoke:opencode-gateway
+
+  # ── 3. Pack validation ─────────────────────────────────────
   pack:
     name: Pack
     needs: install
@@ -63,7 +93,7 @@ jobs:
           path: "*.tgz"
           retention-days: 7
 
-  # ── 5. Plugin manifest validation ──────────────────────────
+  # ── 4. Plugin manifest validation ──────────────────────────
   manifest:
     name: Manifest
     runs-on: ubuntu-latest
@@ -104,7 +134,7 @@ jobs:
             console.log('   openclawVersion:', oc.build.openclawVersion);
           "
 
-  # ── 6. Package size guard ──────────────────────────────────
+  # ── 5. Package size guard ──────────────────────────────────
   size:
     name: Size Guard
     needs: pack
