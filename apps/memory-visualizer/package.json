@@ -1,0 +1,34 @@
+{
+  "name": "@tencentdb-agent-memory/memory-visualizer",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "npm run build:client && npm run build:server",
+    "build:client": "vite build",
+    "build:server": "vite build --config vite.server.config.ts",
+    "check:docker": "node scripts/check-docker-sidecar.mjs",
+    "start": "node dist-server/production.js",
+    "test": "vitest run",
+    "test:e2e": "playwright install chromium && npm run build && playwright test",
+    "safety:readonly": "node scripts/check-readonly.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "vite": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "mermaid": "latest"
+  },
+  "devDependencies": {
+    "@playwright/test": "latest",
+    "@types/node": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "jsdom": "latest",
+    "typescript": "latest",
+    "vitest": "latest"
+  }
+}
