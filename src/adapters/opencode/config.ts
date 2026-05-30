@@ -74,7 +74,10 @@ export function parseOpenCodePluginConfig(
   const tools = getObject(input, "tools");
   const redaction = getObject(input, "redaction");
 
-  const apiKey = requireApiKey(getString(input, "apiKey") ?? getEnvString(env, "TDAI_GATEWAY_API_KEY"));
+  const apiKeySource = Object.hasOwn(input, "apiKey")
+    ? getString(input, "apiKey")
+    : getEnvString(env, "TDAI_GATEWAY_API_KEY");
+  const apiKey = requireApiKey(apiKeySource);
 
   return {
     gatewayUrl: normalizeGatewayUrl(getString(input, "gatewayUrl") ?? OPEN_CODE_PLUGIN_DEFAULTS.gatewayUrl),
