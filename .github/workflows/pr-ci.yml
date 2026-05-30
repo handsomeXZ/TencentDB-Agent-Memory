@@ -25,12 +25,18 @@ jobs:
         uses: actions/cache@v4
         id: cache-deps
         with:
-          path: node_modules
-          key: deps-${{ runner.os }}-${{ hashFiles('package.json') }}
+          path: |
+            node_modules
+            apps/memory-visualizer/node_modules
+          key: deps-${{ runner.os }}-${{ hashFiles('package.json', 'package-lock.json', 'apps/memory-visualizer/package.json', 'apps/memory-visualizer/package-lock.json') }}
 
       - name: npm install
         if: steps.cache-deps.outputs.cache-hit != 'true'
         run: npm install --ignore-scripts
+
+      - name: npm install memory visualizer
+        if: steps.cache-deps.outputs.cache-hit != 'true'
+        run: npm --prefix apps/memory-visualizer install --ignore-scripts
 
   # ── 2. Standard command verification ───────────────────────
   verify:
@@ -47,8 +53,10 @@ jobs:
       - name: Restore node_modules
         uses: actions/cache@v4
         with:
-          path: node_modules
-          key: deps-${{ runner.os }}-${{ hashFiles('package.json') }}
+          path: |
+            node_modules
+            apps/memory-visualizer/node_modules
+          key: deps-${{ runner.os }}-${{ hashFiles('package.json', 'package-lock.json', 'apps/memory-visualizer/package.json', 'apps/memory-visualizer/package-lock.json') }}
 
       - name: npm run build
         run: npm run build
@@ -61,6 +69,24 @@ jobs:
 
       - name: CI-safe Gateway smoke (no secret required)
         run: npm run smoke:opencode-gateway
+
+      - name: Memory Visualizer typecheck
+        run: npm --prefix apps/memory-visualizer run typecheck
+
+      - name: Memory Visualizer tests
+        run: npm --prefix apps/memory-visualizer test
+
+      - name: Memory Visualizer build
+        run: npm --prefix apps/memory-visualizer run build
+
+      - name: Memory Visualizer read-only safety
+        run: npm --prefix apps/memory-visualizer run safety:readonly
+
+      - name: Memory Visualizer Docker sidecar check
+        run: npm --prefix apps/memory-visualizer run check:docker
+
+      - name: Memory Visualizer docs check
+        run: node apps/memory-visualizer/scripts/check-docs.mjs
 
   # ── 3. Pack validation ─────────────────────────────────────
   pack:
@@ -77,8 +103,10 @@ jobs:
       - name: Restore node_modules
         uses: actions/cache@v4
         with:
-          path: node_modules
-          key: deps-${{ runner.os }}-${{ hashFiles('package.json') }}
+          path: |
+            node_modules
+            apps/memory-visualizer/node_modules
+          key: deps-${{ runner.os }}-${{ hashFiles('package.json', 'package-lock.json', 'apps/memory-visualizer/package.json', 'apps/memory-visualizer/package-lock.json') }}
 
       - name: npm pack (dry-run)
         run: npm pack --dry-run

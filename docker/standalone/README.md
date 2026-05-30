@@ -1,13 +1,13 @@
 # TencentDB Agent Memory Gateway Standalone Docker
 
-This directory builds a Gateway-only Docker image for TencentDB Agent Memory. It clones the GitHub release tag `v1.0.0-beta.1`, verifies that the checked-out commit is exactly `36b0537676dc31b7b1a61f23521303c9a148b509`, installs runtime dependencies from that source tree, and starts only the Node Gateway. It does not install or run Hermes, OpenClaw, or any host agent.
+This directory builds a Gateway Docker image for TencentDB Agent Memory and wires an optional read-only Memory Visualizer sidecar. The Gateway image clones the GitHub release tag `v1.0.0-beta.1`, verifies that the checked-out commit is exactly `36b0537676dc31b7b1a61f23521303c9a148b509`, installs runtime dependencies from that source tree, and starts the Node Gateway. It does not install or run Hermes, OpenClaw, or any host agent.
 
 The standalone config uses OpenRouter embeddings with `qwen/qwen3-embedding-8b` at 4096 dimensions. The L1/L2/L3 memory extraction pipeline still needs a separate chat/completion LLM, configured with `TDAI_LLM_BASE_URL`, `TDAI_LLM_API_KEY`, and `TDAI_LLM_MODEL`.
 
 ## Files
 
 - `Dockerfile`: Node 22.16 Gateway-only image pinned to GitHub tag `v1.0.0-beta.1` and verified against commit `36b0537676dc31b7b1a61f23521303c9a148b509`.
-- `docker-compose.yml`: Local service, data volume, config mount, port mapping, and healthcheck.
+- `docker-compose.yml`: Gateway service, read-only visualizer sidecar, shared data volume, config mount, port mappings, and healthchecks.
 - `tdai-gateway.standalone.yaml`: Gateway, data, LLM, and OpenRouter embedding config.
 - `.env.example`: Secret-safe template. Copy it to `.env.local` before running.
 
@@ -57,9 +57,15 @@ cd docker/standalone
 docker compose up -d
 ```
 
-The default compose publish is `127.0.0.1:8420:8420`, so the Gateway listens on `http://127.0.0.1:8420` by default and stores data in the named Docker volume `tdai_memory_data`, mounted at `/data/memory-tdai` inside the container.
+The default compose publish is `127.0.0.1:8420:8420`, so the Gateway listens on `http://127.0.0.1:8420` by default and stores data in the named Docker volume `tdai_memory_data`, mounted read-write at `/data/memory-tdai` inside the Gateway container.
+
+The compose file also starts `tdai-visualizer` on `http://127.0.0.1:8421`. It mounts the same `tdai_memory_data` volume read-only at `/data/memory-tdai:ro`, sets `TDAI_VIS_DATA_DIR=/data/memory-tdai` and `TDAI_VIS_OFFLOAD_ROOT=/data/memory-tdai/offload`, and serves the dashboard plus read-only `/api/*` endpoints from one Node process. It does not run the Vite development server.
+
+Gateway Search/Recall Debug proxying is disabled by default in the sidecar because recall and search can reveal memory contents. To opt in for a trusted local deployment, add `TDAI_VIS_GATEWAY_URL=http://tdai-gateway:8420` to the `tdai-visualizer` environment and add `TDAI_VIS_GATEWAY_API_KEY=${TDAI_GATEWAY_API_KEY:-}` only when the Gateway requires the bearer token. The visualizer still allows only fixed read/query debug endpoints and no `/capture`, `/seed`, or `/session/end` passthrough.
 
 If you need to expose the Gateway beyond localhost, first set a strong non-empty `TDAI_GATEWAY_API_KEY`, then add network controls such as a firewall rule, reverse proxy allow-list, private subnet, or VPN before changing the published host binding.
+
+If you need to open the visualizer to another machine, prefer an authenticated HTTPS reverse proxy in front of `127.0.0.1:8421`. Do not expose the Gateway write-capable `8420` port publicly just to view memory data.
 
 ## Health Check
 
@@ -67,9 +73,10 @@ If you need to expose the Gateway beyond localhost, first set a strong non-empty
 
 ```bash
 curl http://127.0.0.1:8420/health
+curl http://127.0.0.1:8421/health
 ```
 
-The container also includes a Docker healthcheck for `http://127.0.0.1:8420/health`.
+The Gateway container includes a Docker healthcheck for `http://127.0.0.1:8420/health`. The visualizer sidecar includes a Docker healthcheck for `http://127.0.0.1:8421/health`.
 
 ## Authenticated Requests
 
@@ -115,6 +122,7 @@ If you explicitly disable gateway auth for local-only testing, use a non-empty l
 ```bash
 cd docker/standalone
 docker compose logs -f tdai-gateway
+docker compose logs -f tdai-visualizer
 docker compose down
 ```
 
@@ -137,8 +145,25 @@ TDAI_GATEWAY_PORT=8420
 TDAI_DEPLOY_MODE=standalone
 ```
 
+The visualizer sidecar sets these runtime values:
+
+```bash
+TDAI_VIS_DATA_DIR=/data/memory-tdai
+TDAI_VIS_OFFLOAD_ROOT=/data/memory-tdai/offload
+TDAI_VIS_HOST=0.0.0.0
+TDAI_VIS_PORT=8421
+```
+
+`TDAI_VIS_GATEWAY_URL` is intentionally absent from those defaults. Set it explicitly only when enabling Search/Recall Debug in a trusted environment.
+
 The Gateway command is:
 
 ```bash
 node --import tsx/esm src/gateway/server.ts
+```
+
+The visualizer command is:
+
+```bash
+node dist-server/production.js
 ```

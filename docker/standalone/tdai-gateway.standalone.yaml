@@ -237,7 +237,7 @@ memory:
   #   model: "openai/gpt-4o-mini"
   #   temperature: 0.2
   #   forceTriggerThreshold: 4
-  #   dataDir: "/data/context-offload"
+  #   dataDir: "/data/memory-tdai/offload"
   #   defaultContextWindow: 200000
   #   maxPairsPerBatch: 20
   #   l2NullThreshold: 4
