@@ -1,0 +1,17 @@
+Command: npm --prefix apps/memory-visualizer test -- parsers corrupt-json offload-invalid-mermaid
+Result: PASS
+
+Summary:
+- Vitest ran the parser test file for corrupt JSON/JSONL and invalid Mermaid evidence scenarios.
+- Test files: 1 passed (1)
+- Tests: 18 passed (18)
+- Corrupt fixture assertions verified manifest parse warnings, line-specific JSONL warnings, retained partial L1 data, invalid Mermaid fallback node/text preservation, offload warnings, refs, and JSON-serializable partial output.
+
+Relevant output:
+> @tencentdb-agent-memory/memory-visualizer@0.0.0 test
+> vitest run parsers corrupt-json offload-invalid-mermaid
+
+RUN v4.1.7 D:/ForkWorkSpace/TencentDB-Agent-Memory/apps/memory-visualizer
+
+Test Files 1 passed (1)
+Tests 18 passed (18)

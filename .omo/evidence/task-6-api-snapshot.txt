@@ -1,0 +1,15 @@
+Task 6 API snapshot evidence
+
+Command:
+npm --prefix apps/memory-visualizer test -- server
+
+Observed result:
+- Vitest ran app-local server tests from apps/memory-visualizer.
+- src/server/server.test.ts passed 5 tests.
+- Snapshot API test launched the Node native HTTP server and requested GET /api/snapshot against the complete-data-dir fixture.
+- Response status was 200 and included persona profile:v1:fixture, 1 scene, 2 structured memories, 4 conversation evidence records, 1 offload canvas, and capabilityReport.
+- The same live server test covered GET /api/scenes, GET /api/memories, GET /api/conversations, GET /api/offload, and GET /api/evidence page payloads.
+- Path traversal input such as dataDir=../../ returned controlled HTTP 400 with code data-dir-traversal.
+
+Final status:
+PASS

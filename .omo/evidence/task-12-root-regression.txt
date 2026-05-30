@@ -1,0 +1,15 @@
+﻿Task 12 Root Regression Evidence
+Date: 2026-05-30
+Scope: repository root regression verification after visualizer Task 12.
+
+Commands and results:
+- `npm test`: initial FAIL. Vitest reported 1 failing root test in `src/adapters/opencode/config.test.ts`: explicit empty `apiKey` did not throw `apiKey is required`.
+- Focused diagnosis: read `src/adapters/opencode/config.test.ts` and `src/adapters/opencode/config.ts`; confirmed `getString(input, "apiKey") ?? env` treated explicit empty config as absent and allowed fallback behavior instead of fast failure.
+- Minimal fix: `src/adapters/opencode/config.ts` now distinguishes explicit `apiKey` presence with `Object.hasOwn(input, "apiKey")` before choosing env fallback, preserving explicit-config precedence and restoring empty-value failure.
+- `npm test -- src/adapters/opencode/config.test.ts`: PASS. Focused Vitest reported 1 file passed, 5 tests passed.
+- `npm test`: PASS after fix. Full root Vitest reported 8 test files passed, 76 tests passed.
+- `npm run build`: PASS. Root `build:plugin` and all script builds completed; tsdown emitted only the existing Node.js v22.17.0 deprecation warning.
+
+Regression conclusion:
+- Root test and build gates are green after the minimal config fix required by the regression failure.
+- No root dependency, workspace wiring, root build script, or visualizer integration change was made.

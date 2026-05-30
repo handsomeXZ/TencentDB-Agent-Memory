@@ -1,0 +1,29 @@
+﻿Task 12 Visualizer Verification Evidence
+Date: 2026-05-30
+Scope: apps/memory-visualizer app-local read-only visualizer verification.
+
+Baseline workspace and artifact checks:
+- `$env:GIT_MASTER='1'; git status --short -- ':!node_modules'`: completed before verification; existing untracked Task 1-11 visualizer/evidence files and modified `.omo/boulder.json` were present before Task 12.
+- `$env:GIT_MASTER='1'; git diff --stat -- ':!node_modules'`: completed before verification; only pre-existing `.omo/boulder.json` diff was reported at baseline.
+- Grep `/capture|/session/end|/seed` under `apps/memory-visualizer/src`: no production-code match; only `src/server/server.test.ts` intentionally tests rejected dangerous route behavior.
+- Grep `writeFile|appendFile|mkdir|rm\(|unlink` under `apps/memory-visualizer/src`: only known non-write false positives in `src/ui/App.tsx` (`unlinked`, `PathConfigurationForm`); authoritative `safety:readonly` passed.
+- Glob `test-results/**` from repo root: no root-level Playwright output found before verification.
+- Existing Task 7-10 screenshots preserved: task-7-ui-shell.png, task-7-missing-data.png, task-8-scene-map.png, task-8-missing-persona.png, task-9-memory-filters.png, task-9-missing-evidence.png, task-10-invalid-mermaid.png, task-10-search-debug.png.
+
+Commands and results:
+- `npm --prefix apps/memory-visualizer run typecheck`: PASS. `tsc --noEmit` completed with exit 0.
+- `npm --prefix apps/memory-visualizer test`: PASS. Vitest reported 8 test files passed, 45 tests passed.
+- `npm --prefix apps/memory-visualizer run build`: PASS. Vite built `apps/memory-visualizer/dist`; emitted non-fatal Mermaid/chunk-size warnings only.
+- `npm --prefix apps/memory-visualizer run safety:readonly`: PASS. Scanned production `src` only, 17 files, no readonly safety violations.
+- `node apps/memory-visualizer/scripts/validate-fixtures.mjs`: PASS. Validated 10 fixture scenarios.
+- `node apps/memory-visualizer/scripts/check-fixture-secrets.mjs`: PASS. Scanned 40 fixture files; no forbidden secret patterns found.
+- `node apps/memory-visualizer/scripts/check-docs.mjs`: PASS. Validated 8 headings, 4 commands, 11 boundary phrases.
+- `npm --prefix apps/memory-visualizer run test:e2e`: initial FAIL, then PASS after a minimal test selector fix. Final run built the app and Playwright reported 8 passed across shell, scene, memory, offload, and gateway debug specs.
+
+Issue fixed during visualizer verification:
+- `apps/memory-visualizer/e2e/shell.spec.ts`: narrowed the route-heading assertion to `exact: true` because `Offload Task Canvas` also matched the table heading `Offload task canvases` under Playwright role strict mode. This did not weaken the check; it targets the intended main route heading.
+
+Final app-local rechecks after fixes:
+- `npm --prefix apps/memory-visualizer run typecheck`: PASS.
+- `npm --prefix apps/memory-visualizer test`: PASS, 8 files / 45 tests.
+- `npm --prefix apps/memory-visualizer run safety:readonly`: PASS, 17 production files scanned.

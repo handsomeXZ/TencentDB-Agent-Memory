@@ -1,0 +1,15 @@
+Task 6 dangerous endpoint evidence
+
+Command:
+npm --prefix apps/memory-visualizer run safety:readonly
+
+Observed result:
+- Readonly safety scan directories: src
+- Readonly safety scan files: 11
+- Readonly safety scan passed.
+- Production src scan reported no references to forbidden Gateway endpoints /capture, /session/end, or /seed.
+- Additional production grep under apps/memory-visualizer/src/server and apps/memory-visualizer/src/providers for /capture|/session/end|/seed|writeFile|appendFile|mkdir|rm\(|unlink|as any|@ts-ignore|catch \{\} returned no matches.
+- Server test POST /api/gateway/capture returned JSON 404 and the mocked Gateway adapter observed calls only to /health, /recall, /search/memories, and /search/conversations.
+
+Final status:
+PASS

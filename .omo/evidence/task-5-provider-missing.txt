@@ -1,0 +1,7 @@
+Command: npm --prefix apps/memory-visualizer test -- providers missing-data-dir
+Result: PASS
+Summary: Vitest ran the provider suite for the missing-data-dir QA scenario; 1 test file passed with 6 tests. The missing dataDir test returns an empty DashboardSnapshot, includes a data-dir-missing warning, and marks memory capabilities missing while Gateway remains disabled.
+
+Additional degraded-path verification:
+- Absent offload root disables offloadCanvas capability without failing the provider.
+- Pagination helpers return typed items/total/offset/limit pages for L1, L0, offload canvases, and offload refs.

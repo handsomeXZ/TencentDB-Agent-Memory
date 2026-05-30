@@ -1,0 +1,3 @@
+Command: npm --prefix apps/memory-visualizer test -- providers
+Result: PASS
+Summary: Provider suite rerun after adding plan-required TDAI_VIS_* env resolution; 1 test file passed with 7 tests. Added assertions cover TDAI_VIS_DATA_DIR env selection, request dataDir overriding env, and TDAI_VIS_OFFLOAD_ROOT/TDAI_VIS_GATEWAY_URL/TDAI_VIS_GATEWAY_API_KEY mapping into DataSourceConfig before fallback aliases.

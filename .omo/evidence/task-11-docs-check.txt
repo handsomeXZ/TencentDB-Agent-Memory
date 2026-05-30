@@ -1,0 +1,4 @@
+Documentation checks passed.
+Validated headings: 8
+Validated commands: 4
+Validated boundary phrases: 11

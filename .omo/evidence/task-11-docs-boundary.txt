@@ -1,0 +1,27 @@
+apps\memory-visualizer\README.md:3:Isolated Vite + React + TypeScript scaffold for a future read-only TencentDB Agent Memory visualizer.
+apps\memory-visualizer\README.md:5:Run commands from the repository root with `npm --prefix apps/memory-visualizer ...` so this app remains app-local and replaceable.
+apps\memory-visualizer\README.md:9:This app is local-only, read-only, non-invasive, and app-local. It is meant for white-box inspection of existing TencentDB Agent Memory artifacts, not for operating the memory system.
+apps\memory-visualizer\README.md:35:Data source priority is request or UI path, then environment variables, then app-local config, then empty state and default examples.
+apps\memory-visualizer\README.md:39:- no edit
+apps\memory-visualizer\README.md:40:- no delete
+apps\memory-visualizer\README.md:41:- no merge
+apps\memory-visualizer\README.md:42:- no reindex
+apps\memory-visualizer\README.md:43:- no capture
+apps\memory-visualizer\README.md:44:- no seed
+apps\memory-visualizer\README.md:45:- no session-end
+apps\memory-visualizer\README.md:47:Gateway `/search/*` is debug text, not structured primary data. For fuller scope, boundaries, supported views, privacy guidance, and the official replacement plan, see [`../../docs/visualization-web.md`](../../docs/visualization-web.md).
+docs\visualization-web.md:5:Memory Visualizer is a local-only, read-only, app-local web surface for inspecting TencentDB Agent Memory artifacts without changing them. It is intentionally non-invasive and replaceable. Run it from `apps/memory-visualizer/`, keep it outside the root runtime, and treat it as a debugging helper for layered memory data rather than an official control plane.
+docs\visualization-web.md:11:Run all commands from the repository root so the app stays app-local:
+docs\visualization-web.md:81:Gateway integration is optional and debug-only in this app. `GET /health`, recall checks, and `/search/*` responses are for diagnostics. Gateway `/search/*` output is raw formatted debug text, not structured primary data, and the visualizer should not treat it as the canonical source of records or conversations.
+docs\visualization-web.md:89:This app is read-only by design. It does not edit memory, delete memory, merge memory, reindex data, capture conversations, run seed imports, trigger session-end flushes, sync profile writes, write persona files, write scene files, or run DB migrations.
+docs\visualization-web.md:93:- no edit
+docs\visualization-web.md:94:- no delete
+docs\visualization-web.md:95:- no merge
+docs\visualization-web.md:96:- no reindex
+docs\visualization-web.md:97:- no capture
+docs\visualization-web.md:98:- no seed
+docs\visualization-web.md:99:- no session-end
+docs\visualization-web.md:127:- Gateway `/search/*` is debug text and may not match the structured file-backed snapshot exactly.
+docs\visualization-web.md:133:This app is intentionally replaceable. The replacement plan is simple:
+docs\visualization-web.md:135:1. Keep contracts, docs, fixtures, and scripts app-local so the root plugin and gateway stay untouched.
+docs\visualization-web.md:152:The docs checker validates headings, exact commands, boundary exclusions, env vars, and replacement wording. Typecheck confirms the app-local code still compiles. The readonly safety script confirms production app code stays away from write APIs and forbidden Gateway write endpoints.

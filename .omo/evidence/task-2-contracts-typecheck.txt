@@ -1,0 +1,19 @@
+Task 2 contracts typecheck and readonly evidence
+Date: 2026-05-30
+
+Command: npm --prefix apps/memory-visualizer run typecheck
+Result: exit 0
+Summary:
+- TypeScript completed with no diagnostics.
+
+Command: npm --prefix apps/memory-visualizer run safety:readonly
+Result: exit 0
+Summary:
+- Readonly safety scan directories: src
+- Readonly safety scan files: 9
+- Readonly safety scan passed.
+
+Command: rg "src/core|src/gateway|src/offload|../../../src" "apps/memory-visualizer/src/contracts"
+Result: no matches
+Summary:
+- No forbidden root runtime imports were found under apps/memory-visualizer/src/contracts.

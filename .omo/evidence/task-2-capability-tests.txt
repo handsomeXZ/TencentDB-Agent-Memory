@@ -1,0 +1,11 @@
+Task 2 capability contract test evidence
+Date: 2026-05-30
+
+Command: npm --prefix apps/memory-visualizer test -- contracts
+Result: exit 0
+Summary:
+- Vitest ran the contracts filter in apps/memory-visualizer.
+- Test files: 1 passed (1)
+- Tests: 3 passed (3)
+- Coverage asserted capability status values: available, missing, partial, error, disabled.
+- Coverage asserted serializable empty DashboardSnapshot defaults and representative DTO construction for persona, scene, L1 structured memory, L0 evidence, offload canvas, Gateway status, parser warning, and DashboardDataProvider methods.

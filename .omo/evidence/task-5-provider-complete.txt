@@ -1,0 +1,10 @@
+Command: npm --prefix apps/memory-visualizer test -- providers complete-data-dir
+Result: PASS
+Summary: Vitest ran the provider suite for the complete-data-dir QA scenario; 1 test file passed with 6 tests. The complete fixture snapshot includes L3 persona, L2 scene, L1 structured memories, L0 conversation evidence, offload canvas/ref counts, aggregation summaries, capability statuses, evidence link index, pagination helpers, and raw vector field serialization checks.
+
+Additional verification:
+- npm --prefix apps/memory-visualizer test -- providers: PASS, 1 file, 6 tests.
+- npm --prefix apps/memory-visualizer run typecheck: PASS.
+- npm --prefix apps/memory-visualizer run safety:readonly: PASS, readonly scan files: 10.
+- rg "embedding|vector|l1_vec|l0_vec" "apps/memory-visualizer/src/providers" -g "!*.test.ts": no production provider matches.
+- rg file mutation API patterns in "apps/memory-visualizer/src/providers": no matches.
