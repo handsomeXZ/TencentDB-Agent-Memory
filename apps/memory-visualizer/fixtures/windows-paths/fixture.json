@@ -1,0 +1,5 @@
+{
+  "scenario": "windows-paths",
+  "description": "Fixture preserves synthetic Windows-style paths for parser normalization tests.",
+  "memoryRoot": "."
+}

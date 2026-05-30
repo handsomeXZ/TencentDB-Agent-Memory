@@ -1,0 +1,5 @@
+{
+  "scenario": "empty-conversations",
+  "description": "Fixture includes an empty L0 conversations file.",
+  "memoryRoot": "."
+}

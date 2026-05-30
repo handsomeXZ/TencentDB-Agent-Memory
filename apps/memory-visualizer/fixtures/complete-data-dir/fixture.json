@@ -1,0 +1,10 @@
+{
+  "scenario": "complete-data-dir",
+  "description": "Complete synthetic memory data directory with offload assets.",
+  "memoryRoot": ".",
+  "personaPath": "profiles/persona.md",
+  "scenesIndexPath": "scene_blocks/index.json",
+  "recordsPath": "records/memory-records.jsonl",
+  "conversationsPath": "conversations/session-alpha.jsonl",
+  "offloadAgentDir": "offload/agent-planner"
+}

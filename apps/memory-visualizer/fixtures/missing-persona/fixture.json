@@ -1,0 +1,5 @@
+{
+  "scenario": "missing-persona",
+  "description": "Fixture omits profiles/persona.md.",
+  "memoryRoot": "."
+}

@@ -1,0 +1,7 @@
+{
+  "scenario": "missing-evidence",
+  "description": "Memory record references source evidence that does not exist in local L0 conversations.",
+  "memoryRoot": ".",
+  "recordsPath": "records/memory-records.jsonl",
+  "conversationsPath": "conversations/session-missing.jsonl"
+}

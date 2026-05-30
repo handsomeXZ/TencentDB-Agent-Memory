@@ -1,0 +1,5 @@
+{
+  "scenario": "empty-scenes",
+  "description": "Fixture keeps the scene layout but with no scene content.",
+  "memoryRoot": "."
+}

@@ -1,0 +1,5 @@
+{
+  "scenario": "offload-invalid-mermaid",
+  "description": "Fixture includes an offload MMD file with invalid Mermaid content.",
+  "memoryRoot": "."
+}

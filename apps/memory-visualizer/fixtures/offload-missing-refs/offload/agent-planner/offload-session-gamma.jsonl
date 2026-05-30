@@ -1,0 +1,1 @@
+{"toolCallId":"call-missing-ref-001","nodeId":"002-N1","toolCall":"inspect refs","summary":"Result ref is intentionally absent.","resultRef":"refs/absent.md","timestamp":"2026-05-30T00:25:00.000Z","sessionKey":"agent:fixture-agent:session-gamma","score":2}

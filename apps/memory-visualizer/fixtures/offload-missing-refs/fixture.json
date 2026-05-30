@@ -1,0 +1,5 @@
+{
+  "scenario": "offload-missing-refs",
+  "description": "Fixture references a missing offload refs file.",
+  "memoryRoot": "."
+}

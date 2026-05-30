@@ -1,0 +1,5 @@
+{
+  "scenario": "missing-metadata",
+  "description": "Fixture omits .metadata/manifest.json while keeping other core files.",
+  "memoryRoot": "."
+}

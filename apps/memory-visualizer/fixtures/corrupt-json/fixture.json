@@ -1,0 +1,5 @@
+{
+  "scenario": "corrupt-json",
+  "description": "Fixture contains intentionally invalid JSON and JSONL.",
+  "memoryRoot": "."
+}

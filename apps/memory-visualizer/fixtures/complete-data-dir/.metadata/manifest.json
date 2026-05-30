@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "createdAt": "2026-05-30T00:00:00.000Z",
+  "store": {
+    "type": "sqlite",
+    "sqlite": { "path": "vectors.db" }
+  },
+  "seed": {
+    "inputFile": "synthetic-conversations.json",
+    "sessions": 1,
+    "rounds": 2,
+    "messages": 4,
+    "startedAt": "2026-05-30T00:00:00.000Z",
+    "completedAt": "2026-05-30T00:00:05.000Z"
+  }
+}
