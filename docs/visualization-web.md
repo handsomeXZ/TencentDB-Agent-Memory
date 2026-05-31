@@ -33,7 +33,7 @@ npm --prefix apps/memory-visualizer run check:docker
 
 ## Docker Sidecar Deployment
 
-The standalone Docker deployment starts two services from `docker/standalone/docker-compose.yml`:
+The standalone Docker deployment starts two services from `docker/standalone/docker-compose.yml` for local builds or `docker/standalone/docker-compose.ghcr.yml` for published GHCR images:
 
 - `tdai-gateway`: the write-capable memory Gateway, bound to `127.0.0.1:8420:8420` by default.
 - `tdai-visualizer`: the read-only dashboard sidecar, bound to `127.0.0.1:8421:8421` by default.
@@ -47,9 +47,12 @@ cd docker/standalone
 docker compose build tdai-visualizer
 docker compose up -d tdai-gateway tdai-visualizer
 curl http://127.0.0.1:8421/health
+docker compose -f docker-compose.ghcr.yml up -d tdai-gateway tdai-visualizer
 ```
 
 Use `http://127.0.0.1:8421` for local inspection. For remote browser access, put a reverse proxy, VPN, or allow-list in front of the visualizer and add authentication there. Do not expose the Gateway write-capable `8420` port to the public internet for dashboard access.
+
+In GHCR deployments, `ghcr.io/<owner>/tencentdb-agent-memory` remains Gateway-only. The visualizer runs as the separate `ghcr.io/<owner>/tencentdb-agent-memory-visualizer` sidecar, and the expected startup log `Memory Visualizer listening on http://0.0.0.0:8421` belongs to the visualizer container logs.
 
 ## Data Sources
 
