@@ -4,6 +4,7 @@ import { URL } from "node:url";
 
 import { GatewayDebugAdapter } from "../providers/gateway-debug-adapter";
 import { LocalDashboardDataProvider } from "../providers/local-dashboard-data-provider";
+import { checkVisualizerAuth, readVisualizerApiKey } from "./auth";
 
 import type {
   ConversationEvidence,
@@ -54,6 +55,7 @@ export function createVisualizerServer(options: VisualizerServerOptions = {}): S
   });
   const env = options.env ?? process.env;
   const maxBodyBytes = options.maxBodyBytes ?? DEFAULT_BODY_LIMIT_BYTES;
+  const apiKey = readVisualizerApiKey(env);
 
   return createServer(async (request: IncomingMessage, response: ServerResponse) => {
     const requestUrl = createRequestUrl(request);
@@ -66,6 +68,11 @@ export function createVisualizerServer(options: VisualizerServerOptions = {}): S
       switch (routeKey) {
         case "GET /health":
           return sendJson(response, 200, { ok: true, readOnly: true });
+      }
+
+      if (!checkVisualizerAuth(request, response, apiKey)) return;
+
+      switch (routeKey) {
         case "GET /api/snapshot":
           return sendJson(response, 200, await provider.getSnapshot(resolveRequestConfig(provider, requestUrl)));
         case "GET /api/scenes": {

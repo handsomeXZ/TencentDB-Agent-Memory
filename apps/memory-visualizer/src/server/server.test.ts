@@ -11,6 +11,7 @@ import type { GatewayFetch, GatewayFetchResponse, GatewayRequestInit } from "../
 const appRoot = fileURLToPath(new URL("../..", import.meta.url));
 const fixtureRoot = path.join(appRoot, "fixtures", "complete-data-dir");
 const secret = "sk-test-secret-1234567890";
+const visualizerSecret = "vis-test-secret-1234567890";
 
 interface RunningServer {
   readonly server: Server;
@@ -65,6 +66,24 @@ describe("visualizer read-only API server", () => {
     expect(traversal.body).toMatchObject({ code: "data-dir-traversal" });
     expect(outside.status).toBe(400);
     expect(outside.body).toMatchObject({ code: "offload-root-outside-root" });
+  });
+
+  it("requires the configured visualizer Bearer token for API routes while leaving health open", async () => {
+    const running = await startServer(undefined, 50, visualizerSecret);
+
+    const health = await getJson(`${running.baseUrl}/health`);
+    const missing = await getJson(`${running.baseUrl}/api/snapshot`);
+    const wrong = await getJson(`${running.baseUrl}/api/snapshot`, authHeaders("wrong-token"));
+    const valid = await getJson(`${running.baseUrl}/api/snapshot`, authHeaders(visualizerSecret));
+
+    expect(health.status).toBe(200);
+    expect(health.body).toMatchObject({ ok: true, readOnly: true });
+    expect(missing.status).toBe(401);
+    expect(missing.body).toMatchObject({ code: "unauthorized" });
+    expect(wrong.status).toBe(401);
+    expect(wrong.body).toMatchObject({ code: "unauthorized" });
+    expect(valid.status).toBe(200);
+    expect(valid.body).toMatchObject({ persona: { profileId: "profile:v1:fixture" } });
   });
 
   it("routes only safe Gateway debug calls and preserves raw formatted search strings", async () => {
@@ -175,7 +194,7 @@ describe("visualizer read-only API server", () => {
   });
 });
 
-async function startServer(gatewayFetch?: GatewayFetch, gatewayTimeoutMs = 50): Promise<RunningServer> {
+async function startServer(gatewayFetch?: GatewayFetch, gatewayTimeoutMs = 50, visualizerApiKey?: string): Promise<RunningServer> {
   const server = createVisualizerServer({
     appConfig: {
       dataDir: fixtureRoot,
@@ -183,7 +202,10 @@ async function startServer(gatewayFetch?: GatewayFetch, gatewayTimeoutMs = 50): 
       gatewayBaseUrl: "http://gateway.test",
       gatewayApiKeyEnv: "TDAI_VIS_GATEWAY_API_KEY",
     },
-    env: { TDAI_VIS_GATEWAY_API_KEY: secret },
+    env: {
+      TDAI_VIS_GATEWAY_API_KEY: secret,
+      ...(visualizerApiKey ? { TDAI_VIS_API_KEY: visualizerApiKey } : {}),
+    },
     fetch: gatewayFetch,
     gatewayTimeoutMs,
   });
@@ -204,8 +226,8 @@ async function closeServer(server: Server): Promise<void> {
   });
 }
 
-async function getJson(url: string): Promise<{ readonly status: number; readonly body: Record<string, unknown> }> {
-  const response = await fetch(url);
+async function getJson(url: string, headers?: HeadersInit): Promise<{ readonly status: number; readonly body: Record<string, unknown> }> {
+  const response = await fetch(url, { headers });
   return { status: response.status, body: await response.json() };
 }
 
@@ -238,6 +260,10 @@ function createResponse(status: number, contentType: string, body: string): Gate
 
 function readBody(init: GatewayRequestInit | undefined): string {
   return typeof init?.body === "string" ? init.body : "";
+}
+
+function authHeaders(token: string): HeadersInit {
+  return { Authorization: `Bearer ${token}` };
 }
 
 function waitForAbort(signal: AbortSignal | null): Promise<GatewayFetchResponse> {
