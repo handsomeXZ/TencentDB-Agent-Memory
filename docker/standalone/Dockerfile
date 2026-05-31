@@ -2,6 +2,7 @@ FROM node:22.16-bookworm-slim
 
 ARG TDAI_RELEASE_TAG=v1.0.0-beta.1
 ARG TDAI_RELEASE_COMMIT=36b0537676dc31b7b1a61f23521303c9a148b509
+ARG TDAI_REPO=https://github.com/Tencent/TencentDB-Agent-Memory.git
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates curl git \
@@ -9,7 +10,10 @@ RUN apt-get update \
 
 WORKDIR /opt/tdai-gateway
 
-RUN git clone --branch ${TDAI_RELEASE_TAG} --depth 1 https://github.com/Tencent/TencentDB-Agent-Memory.git . \
+RUN git init . \
+    && git remote add origin "${TDAI_REPO}" \
+    && git fetch --depth 1 origin "${TDAI_RELEASE_TAG}" \
+    && git checkout --detach FETCH_HEAD \
     && test "$(git rev-parse HEAD)" = "${TDAI_RELEASE_COMMIT}" \
     && npm install --omit=dev \
     && rm -rf .git \
