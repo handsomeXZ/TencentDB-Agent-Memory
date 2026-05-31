@@ -1,0 +1,31 @@
+export type {
+  CapabilityReport,
+  CapabilityState,
+  CapabilityStatusValue,
+  ConversationEvidence,
+  DashboardDataProvider,
+  DashboardSnapshot,
+  DataSourceConfig,
+  GatewayDebugState,
+  GatewayStatus,
+  JsonPrimitive,
+  JsonValue,
+  OffloadCanvas,
+  OffloadCanvasNode,
+  OffloadNodeStatus,
+  OffloadReference,
+  ParserWarning,
+  ParserWarningSeverity,
+  PersonaSummary,
+  SceneBlockSummary,
+  StructuredMemorySummary,
+} from "./dashboard";
+
+export {
+  CAPABILITY_STATUS_VALUES,
+  createCapabilityState,
+  createDefaultCapabilityReport,
+  createDefaultDataSourceConfig,
+  createDefaultGatewayStatus,
+  createEmptyDashboardSnapshot,
+} from "./dashboard";
