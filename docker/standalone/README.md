@@ -29,6 +29,7 @@ TDAI_LLM_BASE_URL=https://api.openai.com/v1
 TDAI_LLM_API_KEY=your-chat-llm-api-key
 TDAI_LLM_MODEL=gpt-4o-mini
 TDAI_GATEWAY_API_KEY=replace-with-a-long-random-token
+TDAI_VIS_API_KEY=replace-with-a-second-long-random-token
 ```
 
 The container fails fast at startup if `OPENROUTER_API_KEY`, `TDAI_LLM_API_KEY`, or `TDAI_GATEWAY_API_KEY` is empty or still set to the example placeholder value.
@@ -105,7 +106,7 @@ docker compose up -d
 
 The default compose publish is `127.0.0.1:8420:8420`, so the Gateway listens on `http://127.0.0.1:8420` by default and stores data in the named Docker volume `tdai_memory_data`, mounted read-write at `/data/memory-tdai` inside the Gateway container.
 
-The compose file also starts `tdai-visualizer` on `http://127.0.0.1:8421`. It mounts the same `tdai_memory_data` volume read-only at `/data/memory-tdai:ro`, sets `TDAI_VIS_DATA_DIR=/data/memory-tdai` and `TDAI_VIS_OFFLOAD_ROOT=/data/memory-tdai/offload`, and serves the dashboard plus read-only `/api/*` endpoints from one Node process. It does not run the Vite development server. `TDAI_VIS_API_KEY` is optional and unset by default so local-only inspection keeps working unchanged.
+The compose file also starts `tdai-visualizer` on `http://127.0.0.1:8421`. It mounts the same `tdai_memory_data` volume read-only at `/data/memory-tdai:ro`, sets `TDAI_VIS_DATA_DIR=/data/memory-tdai` and `TDAI_VIS_OFFLOAD_ROOT=/data/memory-tdai/offload`, and serves the dashboard plus read-only `/api/*` endpoints from one Node process. It does not run the Vite development server. Set `TDAI_VIS_API_KEY` in `.env.local`; production visualizer APIs fail closed without it.
 
 To run from published GHCR images instead of local build contexts:
 
@@ -126,7 +127,7 @@ Gateway Search/Recall Debug proxying is disabled by default in the sidecar becau
 
 If you need to expose the Gateway beyond localhost, first set a strong non-empty `TDAI_GATEWAY_API_KEY`, then add network controls such as a firewall rule, reverse proxy allow-list, private subnet, or VPN before changing the published host binding.
 
-If you need to open the visualizer to another machine, you can set `TDAI_VIS_API_KEY` on the `tdai-visualizer` service so every read-only `/api/*` route except `GET /health` requires `Authorization: Bearer <key>`, while the SPA shell itself still loads for the browser login screen. That gate is still only a shared Bearer token, not a multi-user auth backend, so prefer an authenticated HTTPS reverse proxy or allow-list in front of `127.0.0.1:8421`. Do not expose the Gateway write-capable `8420` port publicly just to view memory data.
+If you need to open the visualizer to another machine, keep `TDAI_VIS_API_KEY` set on the `tdai-visualizer` service so every read-only `/api/*` route except `GET /health` requires `Authorization: Bearer <key>`, while the SPA shell itself still loads for the browser login screen. That gate is still only a shared Bearer token, not a multi-user auth backend, so prefer an authenticated HTTPS reverse proxy or allow-list in front of `127.0.0.1:8421`. Do not expose the Gateway write-capable `8420` port publicly just to view memory data.
 
 ## Health Check
 
@@ -158,7 +159,7 @@ curl -X POST http://127.0.0.1:8420/recall \
   -d '{"query":"test memory","session_key":"standalone-demo"}'
 ```
 
-The visualizer has its own optional auth gate. Leave `TDAI_VIS_API_KEY` unset for the default local-only shape, or set it on `tdai-visualizer` when you want every read-only `/api/*` route except `GET /health` to require a Bearer token.
+The visualizer has its own auth gate in production containers. Set `TDAI_VIS_API_KEY` on `tdai-visualizer` so every read-only `/api/*` route except `GET /health` requires a Bearer token.
 
 Example protected visualizer request after exporting your own `TDAI_VIS_API_KEY`:
 
@@ -241,7 +242,7 @@ TDAI_VIS_PORT=8421
 
 `TDAI_VIS_GATEWAY_URL` is intentionally absent from those defaults. Set it explicitly only when enabling Search/Recall Debug in a trusted environment.
 
-`TDAI_VIS_API_KEY` is also intentionally absent from those defaults. Set it explicitly only when opting into the visualizer's shared Bearer-token gate.
+`TDAI_VIS_API_KEY` is intentionally not hard-coded in the image. Set it in `.env.local` or the deployment platform environment; production `/api/*` requests fail closed with `auth-not-configured` when it is missing.
 
 The Gateway command is:
 
