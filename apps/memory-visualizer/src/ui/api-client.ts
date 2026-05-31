@@ -94,6 +94,10 @@ export function isDashboardAuthError(error: unknown): boolean {
   return error instanceof DashboardApiError && error.status === 401 && error.code === "unauthorized";
 }
 
+export function isDashboardAuthConfigurationError(error: unknown): boolean {
+  return error instanceof DashboardApiError && error.status === 503 && error.code === "auth-not-configured";
+}
+
 export function createDashboardApiClient(baseUrl = "", options: DashboardApiClientOptions = {}): DashboardApiClient {
   return {
     getSnapshot: (config) => fetchJson<DashboardSnapshot>(buildApiUrl(baseUrl, "/api/snapshot", config), options),

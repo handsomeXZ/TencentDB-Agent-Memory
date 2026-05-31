@@ -108,6 +108,13 @@ describe("ui-shell App", () => {
     expect(textContent()).not.toContain("输入共享访问密钥");
   });
 
+  it("shows a deployment configuration error when production auth lacks a server key", async () => {
+    await renderApp(undefined, createAuthConfigurationErrorClientFactory());
+
+    expect(textContent()).toContain("输入共享访问密钥");
+    expect(textContent()).toContain("尚未配置 TDAI_VIS_API_KEY");
+  });
+
   it("clears a stored shared key when auth is not required", async () => {
     window.sessionStorage.setItem("tdai-memory-visualizer-api-key", "stale-token");
 
@@ -282,6 +289,27 @@ function createAuthAwareClientFactory(snapshot: DashboardSnapshot, secret: strin
         assertKey();
         return delegate.runGatewayConversationSearchDebug(config, body);
       },
+    };
+  };
+}
+
+function createAuthConfigurationErrorClientFactory(): (getApiKey: () => string | undefined) => DashboardApiClient {
+  return () => {
+    const reject = async () => {
+      throw new DashboardApiError("Memory Visualizer authentication is required but TDAI_VIS_API_KEY is not configured. (auth-not-configured)", 503, "auth-not-configured");
+    };
+
+    return {
+      getSnapshot: reject,
+      getScenes: reject,
+      getMemories: reject,
+      getEvidence: reject,
+      getConversations: reject,
+      getOffload: reject,
+      getGatewayHealth: reject,
+      runGatewayRecallDebug: reject,
+      runGatewayMemorySearchDebug: reject,
+      runGatewayConversationSearchDebug: reject,
     };
   };
 }

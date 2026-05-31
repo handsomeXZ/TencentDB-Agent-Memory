@@ -5,6 +5,7 @@ import type { FormEvent, ReactNode } from "react";
 import {
   buildSourceQueryString,
   createDashboardApiClient,
+  isDashboardAuthConfigurationError,
   createEmptySourceQueryConfig,
   isDashboardAuthError,
   readSourceQueryConfig,
@@ -160,12 +161,32 @@ export function App({ apiClient, apiClientFactory }: AppProps) {
 
       if (cancelled) return;
 
+      if (result === "auth-not-configured") {
+        clearStoredVisualizerApiKey();
+        setActiveApiKey(undefined);
+        setAuthRequirement("required");
+        setLoginBusy(false);
+        setLoginError("服务端已要求访问验证，但尚未配置 TDAI_VIS_API_KEY。请先在部署环境中设置共享访问密钥并重启服务。");
+        clearDashboardState(setSnapshotState, setSceneState, setMemoryState, setEvidenceState, setConversationState, setOffloadState);
+        return;
+      }
+
       if (result === "unauthorized") {
         if (!activeApiKey && authRequirement === "unknown" && storedApiKey) {
           const storedClient = clientFactory(() => storedApiKey);
           const storedResult = await requestDashboardData(storedClient, sourceQuery);
 
           if (cancelled) return;
+
+          if (storedResult === "auth-not-configured") {
+            clearStoredVisualizerApiKey();
+            setActiveApiKey(undefined);
+            setAuthRequirement("required");
+            setLoginBusy(false);
+            setLoginError("服务端已要求访问验证，但尚未配置 TDAI_VIS_API_KEY。请先在部署环境中设置共享访问密钥并重启服务。");
+            clearDashboardState(setSnapshotState, setSceneState, setMemoryState, setEvidenceState, setConversationState, setOffloadState);
+            return;
+          }
 
           if (storedResult !== "unauthorized") {
             setActiveApiKey(storedApiKey);
@@ -250,6 +271,13 @@ export function App({ apiClient, apiClientFactory }: AppProps) {
 
     const temporaryClient = clientFactory(() => candidate);
     const result = await requestDashboardData(temporaryClient, sourceQuery);
+
+    if (result === "auth-not-configured") {
+      setLoginBusy(false);
+      setLoginError("服务端尚未配置 TDAI_VIS_API_KEY，当前无法验证共享访问密钥。");
+      clearStoredVisualizerApiKey();
+      return;
+    }
 
     if (result === "unauthorized") {
       setLoginBusy(false);
@@ -1515,7 +1543,7 @@ function clearDashboardState(
   setOffloadState(readyState());
 }
 
-async function requestDashboardData(client: DashboardApiClient, sourceQuery: SourceQueryConfig): Promise<DashboardLoadState | "unauthorized"> {
+async function requestDashboardData(client: DashboardApiClient, sourceQuery: SourceQueryConfig): Promise<DashboardLoadState | "unauthorized" | "auth-not-configured"> {
   const [snapshot, scenes, memories, evidence, conversations, offload] = await Promise.allSettled([
     client.getSnapshot(sourceQuery),
     client.getScenes(sourceQuery),
@@ -1528,6 +1556,9 @@ async function requestDashboardData(client: DashboardApiClient, sourceQuery: Sou
   const settledResults: readonly PromiseSettledResult<unknown>[] = [snapshot, scenes, memories, evidence, conversations, offload];
   if (settledResults.some((result) => isUnauthorizedResult(result))) {
     return "unauthorized";
+  }
+  if (settledResults.some((result) => isAuthConfigurationErrorResult(result))) {
+    return "auth-not-configured";
   }
 
   return {
@@ -1559,6 +1590,10 @@ function applyDashboardLoadResult(
 
 function isUnauthorizedResult<T>(result: PromiseSettledResult<T>): boolean {
   return result.status === "rejected" && isDashboardAuthError(result.reason);
+}
+
+function isAuthConfigurationErrorResult<T>(result: PromiseSettledResult<T>): boolean {
+  return result.status === "rejected" && isDashboardAuthConfigurationError(result.reason);
 }
 
 function toAsyncState<T>(result: PromiseSettledResult<T>): AsyncState<T> {
