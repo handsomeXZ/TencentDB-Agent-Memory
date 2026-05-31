@@ -8,13 +8,15 @@ const appRoot = fileURLToPath(new URL("..", import.meta.url));
 const repoRoot = path.resolve(appRoot, "..", "..");
 const composePath = path.join(repoRoot, "docker", "standalone", "docker-compose.yml");
 const ghcrComposePath = path.join(repoRoot, "docker", "standalone", "docker-compose.ghcr.yml");
+const gatewayDockerfilePath = path.join(repoRoot, "docker", "standalone", "Dockerfile");
 const dockerfilePath = path.join(appRoot, "Dockerfile");
 
 const requiredComposeSnippets = [
   "tdai-visualizer:",
   "context: ../../apps/memory-visualizer",
   "dockerfile: Dockerfile",
-  "image: tdai-memory-visualizer:1.0.0-beta.1",
+  "image: tdai-memory-gateway:local",
+  "image: tdai-memory-visualizer:local",
   "TDAI_VIS_DATA_DIR: /data/memory-tdai",
   "TDAI_VIS_OFFLOAD_ROOT: /data/memory-tdai/offload",
   "env_file:",
@@ -55,23 +57,36 @@ const requiredDockerfileSnippets = [
   "CMD [\"node\", \"dist-server/production.js\"]",
 ];
 
+const requiredGatewayDockerfileSnippets = [
+  "ARG TDAI_RELEASE_TAG=dev",
+  "ARG TDAI_RELEASE_COMMIT=",
+  "if [ -n \"${TDAI_RELEASE_COMMIT}\" ]; then test \"$(git rev-parse HEAD)\" = \"${TDAI_RELEASE_COMMIT}\"; fi",
+  "exec node --import tsx/esm src/gateway/server.ts",
+];
+
 function requireSnippet(label, text, snippet, failures) {
   if (!text.includes(snippet)) failures.push(`${label} missing: ${snippet}`);
 }
 
 async function main() {
-  const [composeText, ghcrComposeText, dockerfileText] = await Promise.all([
+  const [composeText, ghcrComposeText, gatewayDockerfileText, dockerfileText] = await Promise.all([
     readFile(composePath, "utf8"),
     readFile(ghcrComposePath, "utf8"),
+    readFile(gatewayDockerfilePath, "utf8"),
     readFile(dockerfilePath, "utf8"),
   ]);
 
   const failures = [];
   for (const snippet of requiredComposeSnippets) requireSnippet("compose sidecar", composeText, snippet, failures);
   for (const snippet of requiredGhcrComposeSnippets) requireSnippet("GHCR compose sidecar", ghcrComposeText, snippet, failures);
+  for (const snippet of requiredGatewayDockerfileSnippets) requireSnippet("gateway Dockerfile", gatewayDockerfileText, snippet, failures);
   for (const snippet of requiredDockerfileSnippets) requireSnippet("visualizer Dockerfile", dockerfileText, snippet, failures);
   validateCompose("compose", composeText, failures);
   validateCompose("GHCR compose", ghcrComposeText, failures);
+
+  if (gatewayDockerfileText.includes("v1.0.0-beta.1") || gatewayDockerfileText.includes("36b0537676dc31b7b1a61f23521303c9a148b509")) {
+    failures.push("gateway Dockerfile must not default to the old beta release pin");
+  }
 
   if (dockerfileText.includes("TDAI_VIS_GATEWAY_URL")) {
     failures.push("visualizer Dockerfile must not enable Gateway debug proxy by default");

@@ -1,12 +1,12 @@
 # TencentDB Agent Memory Gateway Standalone Docker
 
-This directory builds a Gateway Docker image for TencentDB Agent Memory and wires an optional read-only Memory Visualizer sidecar. The Gateway image clones the GitHub release tag `v1.0.0-beta.1`, verifies that the checked-out commit is exactly `36b0537676dc31b7b1a61f23521303c9a148b509`, installs runtime dependencies from that source tree, and starts the Node Gateway. It does not install or run Hermes, OpenClaw, or any host agent.
+This directory builds a Gateway Docker image for TencentDB Agent Memory and wires an optional read-only Memory Visualizer sidecar. The Gateway image clones a configured Git ref, installs runtime dependencies from that source tree, and starts the Node Gateway. Local builds default to the `dev` ref so the standalone Gateway can pick up current Gateway APIs; release and GHCR builds pass an exact commit through `TDAI_RELEASE_COMMIT` for reproducibility. It does not install or run Hermes, OpenClaw, or any host agent.
 
 The standalone config uses OpenRouter embeddings with `qwen/qwen3-embedding-8b` at 4096 dimensions. The L1/L2/L3 memory extraction pipeline still needs a separate chat/completion LLM, configured with `TDAI_LLM_BASE_URL`, `TDAI_LLM_API_KEY`, and `TDAI_LLM_MODEL`.
 
 ## Files
 
-- `Dockerfile`: Node 22.16 Gateway-only image pinned to GitHub tag `v1.0.0-beta.1` and verified against commit `36b0537676dc31b7b1a61f23521303c9a148b509`.
+- `Dockerfile`: Node 22.16 Gateway-only image that clones `TDAI_RELEASE_TAG` from `TDAI_REPO`, optionally verifies `TDAI_RELEASE_COMMIT`, and starts the Gateway.
 - `docker-compose.yml`: local build-from-source Gateway service, read-only visualizer sidecar, shared data volume, config mount, port mappings, and healthchecks.
 - `docker-compose.ghcr.yml`: GHCR-based Gateway plus read-only visualizer sidecar using published images instead of local build contexts.
 - `tdai-gateway.standalone.yaml`: Gateway, data, LLM, and OpenRouter embedding config.
@@ -38,7 +38,7 @@ Do not put real API keys in `Dockerfile`, `docker-compose.yml`, or `tdai-gateway
 
 ## Build
 
-Both commands below build from the `docker/standalone` directory. During the image build, Docker clones GitHub tag `v1.0.0-beta.1` inside the image, verifies that `git rev-parse HEAD` matches `36b0537676dc31b7b1a61f23521303c9a148b509`, and then installs dependencies instead of pulling the beta package from npm.
+Both commands below build from the `docker/standalone` directory. During the image build, Docker clones `TDAI_RELEASE_TAG` from `TDAI_REPO` inside the image and installs dependencies from that source tree instead of pulling a package from npm. The default local build uses `TDAI_RELEASE_TAG=dev`; pass both `TDAI_RELEASE_TAG` and `TDAI_RELEASE_COMMIT` when you need an exact reproducible source revision.
 
 ```bash
 cd docker/standalone
@@ -49,7 +49,7 @@ Or build directly:
 
 ```bash
 cd docker/standalone
-docker build -t tdai-memory-gateway:1.0.0-beta.1 .
+docker build -t tdai-memory-gateway:local .
 ```
 
 ## Publish To GHCR
@@ -123,7 +123,7 @@ cd docker/standalone
 TDAI_GHCR_OWNER=your_github_username TDAI_GHCR_TAG=sha-<commit> docker compose -f docker-compose.ghcr.yml up -d
 ```
 
-Gateway Search/Recall Debug proxying is disabled by default in the sidecar because recall and search can reveal memory contents. To opt in for a trusted local deployment, add `TDAI_VIS_GATEWAY_URL=http://tdai-gateway:8420` to the `tdai-visualizer` environment and add `TDAI_VIS_GATEWAY_API_KEY=${TDAI_GATEWAY_API_KEY:-}` only when the Gateway requires the bearer token. The visualizer still allows only fixed read/query debug endpoints and no `/capture`, `/seed`, or `/session/end` passthrough.
+Gateway Search/Recall Debug proxying is disabled by default in the sidecar because recall and search can reveal memory contents. To opt in while still using the default local filesystem data source, leave `TDAI_VIS_DATA_SOURCE` unset or local, add `TDAI_VIS_GATEWAY_URL=http://tdai-gateway:8420` to the `tdai-visualizer` environment, and add `TDAI_VIS_GATEWAY_API_KEY=${TDAI_GATEWAY_API_KEY:-}` only when the Gateway requires the bearer token. The visualizer still allows only fixed read/query debug endpoints and no `/capture`, `/seed`, or `/session/end` passthrough.
 
 If you need to expose the Gateway beyond localhost, first set a strong non-empty `TDAI_GATEWAY_API_KEY`, then add network controls such as a firewall rule, reverse proxy allow-list, private subnet, or VPN before changing the published host binding.
 
@@ -240,7 +240,9 @@ TDAI_VIS_HOST=0.0.0.0
 TDAI_VIS_PORT=8421
 ```
 
-`TDAI_VIS_GATEWAY_URL` is intentionally absent from those defaults. Set it explicitly only when enabling Search/Recall Debug in a trusted environment.
+`TDAI_VIS_GATEWAY_URL` is intentionally absent from those defaults. Set it explicitly only when enabling Search/Recall Debug in a trusted local-source environment, or when `TDAI_VIS_DATA_SOURCE=gateway` makes Gateway `/visualizer/*` the primary dashboard DTO source.
+
+If your deployment platform cannot mount the same `tdai_memory_data` volume into both containers, run the visualizer in remote Gateway data-source mode instead of using `TDAI_VIS_DATA_DIR`: set `TDAI_VIS_DATA_SOURCE=gateway`, `TDAI_VIS_GATEWAY_URL=http://<gateway-service>:8420`, and `TDAI_VIS_GATEWAY_API_KEY=${TDAI_GATEWAY_API_KEY}`. The Gateway `/visualizer/*` endpoints require `TDAI_GATEWAY_API_KEY` and only serve read-only dashboard DTOs; this mode is distinct from Search/Recall Debug even though it reuses the same Gateway URL variable.
 
 `TDAI_VIS_API_KEY` is intentionally not hard-coded in the image. Set it in `.env.local` or the deployment platform environment; production `/api/*` requests fail closed with `auth-not-configured` when it is missing.
 
