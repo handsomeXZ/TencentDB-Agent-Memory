@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: tdai-memory-gateway:1.0.0-beta.1
+    image: tdai-memory-gateway:local
     container_name: tdai-memory-gateway
     restart: unless-stopped
     env_file:
@@ -30,7 +30,7 @@ services:
     build:
       context: ../../apps/memory-visualizer
       dockerfile: Dockerfile
-    image: tdai-memory-visualizer:1.0.0-beta.1
+    image: tdai-memory-visualizer:local
     container_name: tdai-memory-visualizer
     restart: unless-stopped
     env_file:
