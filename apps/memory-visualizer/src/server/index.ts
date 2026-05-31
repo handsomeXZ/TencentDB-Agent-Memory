@@ -4,6 +4,7 @@ import { URL } from "node:url";
 
 import { GatewayDebugAdapter } from "../providers/gateway-debug-adapter";
 import { LocalDashboardDataProvider } from "../providers/local-dashboard-data-provider";
+import { RemoteDashboardDataProvider } from "../providers/remote-dashboard-data-provider";
 import { checkVisualizerAuth, readVisualizerAuthConfig } from "./auth";
 
 import type {
@@ -46,14 +47,13 @@ class HttpError extends Error {
 const DEFAULT_BODY_LIMIT_BYTES = 16 * 1024;
 const DEFAULT_PAGE_LIMIT = 50;
 const MAX_PAGE_LIMIT = 500;
+const GATEWAY_DATA_SOURCE = "gateway";
+
+type DashboardProvider = LocalDashboardDataProvider | RemoteDashboardDataProvider;
 
 export function createVisualizerServer(options: VisualizerServerOptions = {}): Server {
-  const provider = new LocalDashboardDataProvider({
-    appConfig: options.appConfig,
-    env: options.env,
-    now: options.now,
-  });
   const env = options.env ?? process.env;
+  const provider = createDashboardProvider(options, env);
   const maxBodyBytes = options.maxBodyBytes ?? DEFAULT_BODY_LIMIT_BYTES;
   const authConfig = readVisualizerAuthConfig(env);
 
@@ -106,7 +106,7 @@ export function createVisualizerServer(options: VisualizerServerOptions = {}): S
   });
 }
 
-async function readOffload(provider: LocalDashboardDataProvider, requestUrl: URL): Promise<{
+async function readOffload(provider: DashboardProvider, requestUrl: URL): Promise<{
   readonly canvases: DashboardPage<OffloadCanvas>;
   readonly references: DashboardPage<OffloadCanvas["refs"][number]>;
 }> {
@@ -120,7 +120,7 @@ async function readOffload(provider: LocalDashboardDataProvider, requestUrl: URL
 }
 
 function createGatewayAdapter(
-  provider: LocalDashboardDataProvider,
+  provider: DashboardProvider,
   requestUrl: URL,
   env: NodeJS.ProcessEnv,
   options: VisualizerServerOptions,
@@ -134,8 +134,34 @@ function createGatewayAdapter(
   });
 }
 
-function resolveRequestConfig(provider: LocalDashboardDataProvider, requestUrl: URL): LocalDashboardRequestConfig {
+function createDashboardProvider(options: VisualizerServerOptions, env: NodeJS.ProcessEnv): DashboardProvider {
+  if (env.TDAI_VIS_DATA_SOURCE?.trim().toLowerCase() === GATEWAY_DATA_SOURCE) {
+    return new RemoteDashboardDataProvider({
+      env,
+      fetch: options.fetch,
+      timeoutMs: options.gatewayTimeoutMs,
+    });
+  }
+
+  return new LocalDashboardDataProvider({
+    appConfig: options.appConfig,
+    env,
+    now: options.now,
+  });
+}
+
+function resolveRequestConfig(provider: DashboardProvider, requestUrl: URL): LocalDashboardRequestConfig {
   const baseline = provider.resolveConfig();
+  if (provider instanceof RemoteDashboardDataProvider) {
+    return {
+      dataDir: baseline.memoryRootPath,
+      offloadRootPath: baseline.offloadRootPath,
+      sourceLabel: readOptionalTextParam(requestUrl, "sourceLabel", 80) ?? baseline.sourceLabel,
+      gatewayBaseUrl: baseline.gatewayBaseUrl,
+      gatewayApiKeyEnv: baseline.gatewayApiKeyEnv,
+    };
+  }
+
   const dataDir = readSafePathParam(requestUrl, "dataDir", baseline.memoryRootPath, "data-dir");
   const offloadRootPath = readSafePathParam(requestUrl, "offloadRootPath", baseline.offloadRootPath, "offload-root");
   const sourceLabel = readOptionalTextParam(requestUrl, "sourceLabel", 80);

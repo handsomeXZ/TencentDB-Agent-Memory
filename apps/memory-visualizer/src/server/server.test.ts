@@ -139,6 +139,68 @@ describe("visualizer read-only API server", () => {
     expect(calls.every((call) => !call.url.includes("capture") && !call.url.includes("seed"))).toBe(true);
   });
 
+  it("uses Gateway visualizer APIs as the dashboard data source without a local data directory", async () => {
+    const calls: { readonly url: string; readonly authorization: string | null }[] = [];
+    const gatewayFetch: GatewayFetch = async (input, init) => {
+      const url = input.toString();
+      const headers = new Headers(init?.headers);
+      calls.push({ url, authorization: headers.get("authorization") });
+      const pathname = new URL(url).pathname;
+
+      if (pathname === "/base/visualizer/snapshot") {
+        return jsonResponse(200, {
+          snapshotId: "remote:snapshot",
+          generatedAt: "2026-05-31T00:00:00.000Z",
+          dataSource: {
+            sourceLabel: "gateway-memory",
+            memoryRootPath: "",
+            profilesPath: "",
+            scenesPath: "",
+            l1DatabasePath: "",
+            l0DatabasePath: "",
+            offloadRootPath: "",
+            gatewayBaseUrl: "http://gateway.test/base",
+            gatewayApiKeyEnv: "TDAI_VIS_GATEWAY_API_KEY",
+            readOnly: true,
+            environmentInputs: ["TDAI_VIS_GATEWAY_URL", "TDAI_VIS_GATEWAY_API_KEY"],
+          },
+          capabilityReport: {},
+          persona: { profileId: "remote-persona" },
+          scenes: [{ sceneId: "remote-scene" }],
+          structuredMemories: [],
+          conversationEvidence: [],
+          offloadCanvases: [],
+          gateway: { baseUrl: "http://gateway.test/base" },
+          warnings: [],
+        });
+      }
+
+      if (pathname === "/base/visualizer/memories") {
+        return jsonResponse(200, { items: [{ recordId: "remote-memory" }], total: 1, offset: 0, limit: 50 });
+      }
+
+      return jsonResponse(404, { error: `unexpected endpoint: ${pathname}` });
+    };
+    const running = await startServer(gatewayFetch, 50, visualizerSecret, {
+      TDAI_VIS_DATA_SOURCE: "gateway",
+      TDAI_VIS_GATEWAY_URL: "http://gateway.test/base",
+      TDAI_VIS_DATA_DIR: "Z:/missing-local-memory-dir",
+    });
+
+    const snapshot = await getJson(`${running.baseUrl}/api/snapshot?dataDir=../../local-should-be-ignored`, authHeaders(visualizerSecret));
+    const memories = await getJson(`${running.baseUrl}/api/memories`, authHeaders(visualizerSecret));
+
+    expect(snapshot.status).toBe(200);
+    expect(snapshot.body).toMatchObject({ snapshotId: "remote:snapshot", persona: { profileId: "remote-persona" } });
+    expect(memories.status).toBe(200);
+    expect(memories.body).toMatchObject({ total: 1, items: [expect.objectContaining({ recordId: "remote-memory" })] });
+    expect(calls.map((call) => new URL(call.url).pathname)).toEqual([
+      "/base/visualizer/snapshot",
+      "/base/visualizer/memories",
+    ]);
+    expect(calls.every((call) => call.authorization === `Bearer ${secret}`)).toBe(true);
+  });
+
   it("returns controlled Gateway warnings for timeout, non-JSON, and 500 responses without leaking API keys", async () => {
     const gatewayFetch: GatewayFetch = async (input, init) => {
       const pathname = new URL(input.toString()).pathname;

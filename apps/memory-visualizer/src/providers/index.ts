@@ -17,6 +17,9 @@ export {
   createLocalDashboardDataProvider,
 } from "./local-dashboard-data-provider";
 
+export type { RemoteDashboardDataProviderOptions } from "./remote-dashboard-data-provider";
+export { RemoteDashboardDataProvider } from "./remote-dashboard-data-provider";
+
 export type {
   ConversationSearchDebugData,
   GatewayDebugAdapterOptions,
