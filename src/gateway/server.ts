@@ -15,8 +15,10 @@
  */
 
 import http from "node:http";
+import path from "node:path";
 import { URL } from "node:url";
 import { timingSafeEqual } from "node:crypto";
+import { LocalDashboardDataProvider } from "../visualizer/providers/local-dashboard-data-provider.js";
 import { TdaiCore } from "../core/tdai-core.js";
 import { StandaloneHostAdapter } from "../adapters/standalone/host-adapter.js";
 import { loadGatewayConfig } from "./config.js";
@@ -40,12 +42,15 @@ import type {
   GatewayErrorResponse,
 } from "./types.js";
 import type { Logger } from "../core/types.js";
+import type { DashboardPage, LocalDashboardRequestConfig } from "../visualizer/providers/local-dashboard-data-provider.js";
 import { validateAndNormalizeRaw, fillTimestamps, SeedValidationError } from "../core/seed/input.js";
 import { executeSeed } from "../core/seed/seed-runtime.js";
 import type { SeedProgress } from "../core/seed/types.js";
 
 const TAG = "[tdai-gateway]";
 const VERSION = "0.1.0";
+const DEFAULT_PAGE_LIMIT = 50;
+const MAX_PAGE_LIMIT = 500;
 
 // ============================
 // Console logger (for standalone gateway — no OpenClaw logger available)
@@ -254,6 +259,14 @@ export class TdaiGateway {
         return this.handleHealth(res);
       }
 
+      // Visualizer DTO routes expose structured memory data, so they require
+      // an explicitly configured Gateway API key even though legacy routes can
+      // still run in auth-disabled mode for local compatibility.
+      if (pathname.startsWith("/visualizer/") && !this.config.server.apiKey) {
+        sendError(res, 503, "Gateway visualizer API requires TDAI_GATEWAY_API_KEY");
+        return;
+      }
+
       // All other routes go through the optional auth gate. When apiKey is
       // unset the gate is a no-op (preserves legacy open behaviour) — the
       // startup WARN in `logSecurityPosture` covers that case.
@@ -272,6 +285,18 @@ export class TdaiGateway {
           return await this.handleSessionEnd(req, res);
         case "POST /seed":
           return await this.handleSeed(req, res);
+        case "GET /visualizer/snapshot":
+          return await this.handleVisualizerSnapshot(url, res);
+        case "GET /visualizer/scenes":
+          return await this.handleVisualizerScenes(url, res);
+        case "GET /visualizer/memories":
+          return await this.handleVisualizerMemories(url, res);
+        case "GET /visualizer/conversations":
+          return await this.handleVisualizerConversations(url, res);
+        case "GET /visualizer/offload":
+          return await this.handleVisualizerOffload(url, res);
+        case "GET /visualizer/evidence":
+          return await this.handleVisualizerEvidence(url, res);
         default:
           sendError(res, 404, `Not found: ${method} ${pathname}`);
       }
@@ -464,6 +489,62 @@ export class TdaiGateway {
     sendJson(res, 200, response);
   }
 
+  private async handleVisualizerSnapshot(url: URL, res: http.ServerResponse): Promise<void> {
+    const provider = this.createVisualizerProvider();
+    sendJson(res, 200, await provider.getSnapshot(this.createVisualizerRequestConfig(url)));
+  }
+
+  private async handleVisualizerScenes(url: URL, res: http.ServerResponse): Promise<void> {
+    const provider = this.createVisualizerProvider();
+    const snapshot = await provider.getSnapshot(this.createVisualizerRequestConfig(url));
+    sendJson(res, 200, paginate(snapshot.scenes, url));
+  }
+
+  private async handleVisualizerMemories(url: URL, res: http.ServerResponse): Promise<void> {
+    const provider = this.createVisualizerProvider();
+    sendJson(res, 200, await provider.getStructuredMemoriesPage(this.createVisualizerRequestConfig(url), readPage(url)));
+  }
+
+  private async handleVisualizerConversations(url: URL, res: http.ServerResponse): Promise<void> {
+    const provider = this.createVisualizerProvider();
+    sendJson(res, 200, await provider.getConversationEvidencePage(this.createVisualizerRequestConfig(url), readPage(url)));
+  }
+
+  private async handleVisualizerOffload(url: URL, res: http.ServerResponse): Promise<void> {
+    const provider = this.createVisualizerProvider();
+    const config = this.createVisualizerRequestConfig(url);
+    const page = readPage(url);
+    const [canvases, references] = await Promise.all([
+      provider.getOffloadCanvasesPage(config, page),
+      provider.getOffloadReferencesPage(config, page),
+    ]);
+    sendJson(res, 200, { canvases, references });
+  }
+
+  private async handleVisualizerEvidence(url: URL, res: http.ServerResponse): Promise<void> {
+    const provider = this.createVisualizerProvider();
+    sendJson(res, 200, await provider.getEvidenceLinkIndex(this.createVisualizerRequestConfig(url)));
+  }
+
+  private createVisualizerProvider(): LocalDashboardDataProvider {
+    return new LocalDashboardDataProvider({
+      appConfig: {
+        dataDir: this.config.data.baseDir,
+        offloadRootPath: path.join(this.config.data.baseDir, "offload"),
+        sourceLabel: "gateway-memory",
+      },
+      env: {},
+    });
+  }
+
+  private createVisualizerRequestConfig(url: URL): LocalDashboardRequestConfig {
+    return {
+      dataDir: this.config.data.baseDir,
+      offloadRootPath: path.join(this.config.data.baseDir, "offload"),
+      sourceLabel: readOptionalTextParam(url, "sourceLabel") ?? "gateway-memory",
+    };
+  }
+
   private async handleSessionEnd(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
     const body = await parseJsonBody<SessionEndRequest>(req);
 
@@ -574,6 +655,37 @@ export class TdaiGateway {
     };
     sendJson(res, 200, response);
   }
+}
+
+function readPage(url: URL): Pick<DashboardPage<unknown>, "offset" | "limit"> {
+  return {
+    offset: readNonNegativeInteger(url, "offset", 0, Number.MAX_SAFE_INTEGER),
+    limit: readNonNegativeInteger(url, "limit", DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT),
+  };
+}
+
+function paginate<T>(items: readonly T[], url: URL): DashboardPage<T> {
+  const page = readPage(url);
+  return {
+    items: items.slice(page.offset, page.offset + page.limit),
+    total: items.length,
+    offset: page.offset,
+    limit: page.limit,
+  };
+}
+
+function readNonNegativeInteger(url: URL, key: string, fallback: number, max: number): number {
+  const raw = url.searchParams.get(key);
+  if (raw === null || raw.trim() === "") return fallback;
+  if (!/^\d+$/.test(raw)) throw new Error(`${key} must be a non-negative integer.`);
+  return Math.min(Number(raw), max);
+}
+
+function readOptionalTextParam(url: URL, key: string): string | undefined {
+  const raw = url.searchParams.get(key);
+  if (raw === null) return undefined;
+  const value = raw.trim();
+  return value.length > 0 ? value : undefined;
 }
 
 // ============================
