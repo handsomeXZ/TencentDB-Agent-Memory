@@ -86,6 +86,17 @@ describe("visualizer read-only API server", () => {
     expect(valid.body).toMatchObject({ persona: { profileId: "profile:v1:fixture" } });
   });
 
+  it("fails closed for production API routes when the visualizer token is missing", async () => {
+    const running = await startServer(undefined, 50, undefined, { NODE_ENV: "production" });
+
+    const health = await getJson(`${running.baseUrl}/health`);
+    const snapshot = await getJson(`${running.baseUrl}/api/snapshot`);
+
+    expect(health.status).toBe(200);
+    expect(snapshot.status).toBe(503);
+    expect(snapshot.body).toMatchObject({ code: "auth-not-configured" });
+  });
+
   it("routes only safe Gateway debug calls and preserves raw formatted search strings", async () => {
     const calls: { readonly url: string; readonly method: string; readonly body: string }[] = [];
     const gatewayFetch: GatewayFetch = async (input, init) => {
@@ -194,7 +205,12 @@ describe("visualizer read-only API server", () => {
   });
 });
 
-async function startServer(gatewayFetch?: GatewayFetch, gatewayTimeoutMs = 50, visualizerApiKey?: string): Promise<RunningServer> {
+async function startServer(
+  gatewayFetch?: GatewayFetch,
+  gatewayTimeoutMs = 50,
+  visualizerApiKey?: string,
+  extraEnv: NodeJS.ProcessEnv = {},
+): Promise<RunningServer> {
   const server = createVisualizerServer({
     appConfig: {
       dataDir: fixtureRoot,
@@ -205,6 +221,7 @@ async function startServer(gatewayFetch?: GatewayFetch, gatewayTimeoutMs = 50, v
     env: {
       TDAI_VIS_GATEWAY_API_KEY: secret,
       ...(visualizerApiKey ? { TDAI_VIS_API_KEY: visualizerApiKey } : {}),
+      ...extraEnv,
     },
     fetch: gatewayFetch,
     gatewayTimeoutMs,

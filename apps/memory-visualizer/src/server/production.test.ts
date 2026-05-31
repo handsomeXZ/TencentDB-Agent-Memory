@@ -98,6 +98,27 @@ describe("production visualizer server", () => {
     expect(asset.body).toContain("font-family");
   });
 
+  it("keeps static SPA pages open but fails closed for production APIs when auth is not configured", async () => {
+    const server = createProductionVisualizerServer({
+      appConfig: {
+        dataDir: fixtureRoot,
+        offloadRootPath: path.join(fixtureRoot, "offload"),
+        gatewayBaseUrl: null,
+      },
+      distRoot: staticRoot,
+      env: { NODE_ENV: "production" },
+    });
+    const baseUrl = await listenServer(server);
+
+    const missingApi = await fetchJson(`${baseUrl}/api/snapshot`);
+    const root = await fetchText(`${baseUrl}/`);
+
+    expect(missingApi.status).toBe(503);
+    expect(missingApi.body).toMatchObject({ code: "auth-not-configured" });
+    expect(root.status).toBe(200);
+    expect(root.body).toContain("Memory Visualizer Fixture");
+  });
+
   it("reads listen options from TDAI_VIS_* first, then HOST/PORT, then defaults", () => {
     expect(readListenOptions({})).toEqual({ host: "127.0.0.1", port: 8421 });
     expect(readListenOptions({ HOST: "127.0.0.1", PORT: "9000" })).toEqual({ host: "127.0.0.1", port: 9000 });
