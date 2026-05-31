@@ -52,7 +52,7 @@ docker build -t tdai-memory-gateway:1.0.0-beta.1 .
 
 ## Publish To GHCR
 
-The repository includes `.github/workflows/publish-ghcr.yml` for publishing the standalone Gateway image to GitHub Container Registry. It runs on pushes to `main`, semantic version tags matching `v*.*.*`, and manual `workflow_dispatch` runs.
+The repository includes `.github/workflows/publish-ghcr.yml` for publishing the standalone Gateway image to GitHub Container Registry. It runs on pushes to `dev`, semantic version tags matching `v*.*.*`, and manual `workflow_dispatch` runs.
 
 Published images use this path:
 
