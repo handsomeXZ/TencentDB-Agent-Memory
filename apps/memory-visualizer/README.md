@@ -45,6 +45,7 @@ Primary data source env vars:
 
 - `TDAI_VIS_DATA_DIR`
 - `TDAI_VIS_OFFLOAD_ROOT`
+- `TDAI_VIS_DATA_SOURCE`
 - `TDAI_VIS_GATEWAY_URL`
 - `TDAI_VIS_GATEWAY_API_KEY`
 
@@ -53,6 +54,8 @@ Visualizer access auth env var:
 - `TDAI_VIS_API_KEY`
 
 Data source priority is request or UI path, then environment variables, then app-local config, then empty state and default examples.
+
+For Zeabur or any deployment where the Visualizer cannot mount the Gateway data volume, set `TDAI_VIS_DATA_SOURCE=gateway`, `TDAI_VIS_GATEWAY_URL` to the Gateway service URL, and `TDAI_VIS_GATEWAY_API_KEY` to the same value as Gateway `TDAI_GATEWAY_API_KEY`. This makes the Visualizer use Gateway `/visualizer/*` read-only DTO APIs instead of reading the local filesystem.
 
 Read-only boundary summary:
 
@@ -64,7 +67,7 @@ Read-only boundary summary:
 - no seed
 - no session-end
 
-Gateway `/search/*` is debug text, not structured primary data. The Docker sidecar disables Gateway debug proxying by default; leave `TDAI_VIS_GATEWAY_URL` unset unless a trusted operator explicitly opts in to the fixed read/query debug endpoints. For fuller scope, boundaries, supported views, privacy guidance, and the official replacement plan, see [`../../docs/visualization-web.md`](../../docs/visualization-web.md).
+Gateway `/search/*` is debug text, not structured primary data. With the default local filesystem data source, the Docker sidecar disables Gateway debug proxying by default; leave `TDAI_VIS_GATEWAY_URL` unset unless a trusted operator explicitly opts in to the fixed read/query debug endpoints. With `TDAI_VIS_DATA_SOURCE=gateway`, the same URL points to the Gateway `/visualizer/*` read-only DTO source instead. For fuller scope, boundaries, supported views, privacy guidance, and the official replacement plan, see [`../../docs/visualization-web.md`](../../docs/visualization-web.md).
 
 For visualizer access, set `TDAI_VIS_API_KEY` whenever the production container is exposed through Docker, GHCR, Zeabur, or another remote host. `GET /health` stays open, the production static SPA pages and assets still load so the browser can show the login screen, and every read-only `/api/*` route requires `Authorization: Bearer <key>`. Missing or wrong API tokens return HTTP 401 from `/api/*`, and the browser UI prompts for the shared key, stores it in `sessionStorage` for the current tab, and attaches `Authorization: Bearer <key>` to subsequent dashboard requests until logout clears that session value. If the production container runs without `TDAI_VIS_API_KEY`, `/api/*` fails closed with `auth-not-configured` instead of exposing dashboard data.
 

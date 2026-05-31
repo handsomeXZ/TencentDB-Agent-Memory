@@ -73,11 +73,14 @@ The primary visualizer environment variable names are:
 
 - `TDAI_VIS_DATA_DIR`
 - `TDAI_VIS_OFFLOAD_ROOT`
+- `TDAI_VIS_DATA_SOURCE`
 - `TDAI_VIS_GATEWAY_URL`
 - `TDAI_VIS_GATEWAY_API_KEY`
 - `TDAI_VIS_API_KEY`
 
-Use `TDAI_VIS_DATA_DIR` for the memory root, `TDAI_VIS_OFFLOAD_ROOT` for offload files when they live outside the default root layout, `TDAI_VIS_GATEWAY_URL` for explicit opt-in debug connectivity, and `TDAI_VIS_GATEWAY_API_KEY` only when the local Gateway requires a bearer token. `TDAI_VIS_API_KEY` is the visualizer's own optional shared Bearer-token gate. Leave it unset for local-only defaults, or set it when you want every read-only `/api/*` route except `GET /health` to require `Authorization: Bearer <key>`, while static SPA assets stay public for the login screen. The Docker sidecar leaves `TDAI_VIS_GATEWAY_URL` unset by default so Search/Recall Debug degrades to disabled instead of proxying recall or search through a reverse proxy accidentally.
+Use `TDAI_VIS_DATA_DIR` for the memory root and `TDAI_VIS_OFFLOAD_ROOT` for offload files when they live outside the default root layout. `TDAI_VIS_GATEWAY_URL` names a Gateway endpoint, but its role depends on `TDAI_VIS_DATA_SOURCE`: with the default local source it only enables explicit opt-in Search/Recall Debug connectivity; with `TDAI_VIS_DATA_SOURCE=gateway` it becomes the primary read-only dashboard DTO source. Use `TDAI_VIS_GATEWAY_API_KEY` when the Gateway requires a bearer token. `TDAI_VIS_API_KEY` is the visualizer's own optional shared Bearer-token gate. Leave it unset for local-only defaults, or set it when you want every read-only `/api/*` route except `GET /health` to require `Authorization: Bearer <key>`, while static SPA assets stay public for the login screen. The Docker sidecar leaves `TDAI_VIS_GATEWAY_URL` unset by default so Search/Recall Debug degrades to disabled instead of proxying recall or search through a reverse proxy accidentally.
+
+For deployment platforms where the Gateway and Visualizer cannot share a filesystem volume, set `TDAI_VIS_DATA_SOURCE=gateway`, `TDAI_VIS_GATEWAY_URL=<gateway-url>`, and `TDAI_VIS_GATEWAY_API_KEY=<same-secret-as-TDAI_GATEWAY_API_KEY>`. In that mode the Visualizer server does not read `TDAI_VIS_DATA_DIR`; it proxies its read-only dashboard DTO routes to Gateway `/visualizer/*` APIs. Those Gateway visualizer APIs fail closed unless `TDAI_GATEWAY_API_KEY` is configured, and every request must include `Authorization: Bearer <key>`. This remote DTO mode is separate from Search/Recall Debug: the same Gateway URL variable is reused, but `TDAI_VIS_DATA_SOURCE=gateway` is the switch that makes Gateway the dashboard data source.
 
 ### Expected local layout
 
@@ -108,7 +111,7 @@ Each layer reports a capability status of `available`, `missing`, `partial`, `er
 
 ### Gateway debug note
 
-Gateway integration is optional and debug-only in this app. `GET /health`, recall checks, and `/search/*` responses are for diagnostics. Gateway `/search/*` output is raw formatted debug text, not structured primary data, and the visualizer should not treat it as the canonical source of records or conversations. The standalone Docker sidecar disables this proxy path by default; to opt in, set `TDAI_VIS_GATEWAY_URL=http://tdai-gateway:8420` and, when auth is enabled, `TDAI_VIS_GATEWAY_API_KEY` in a trusted deployment. The server still exposes only the fixed read/query debug endpoints and no Gateway `/capture`, `/seed`, or `/session/end` passthrough.
+Gateway Search/Recall Debug is optional and debug-only in this app. `GET /health`, recall checks, and `/search/*` responses are for diagnostics. Gateway `/search/*` output is raw formatted debug text, not structured primary data, and the visualizer should not treat it as the canonical source of records or conversations. The standalone Docker sidecar disables this proxy path by default; to opt in while still using the default local filesystem data source, leave `TDAI_VIS_DATA_SOURCE` unset or local, set `TDAI_VIS_GATEWAY_URL=http://tdai-gateway:8420`, and, when auth is enabled, `TDAI_VIS_GATEWAY_API_KEY` in a trusted deployment. The server still exposes only the fixed read/query debug endpoints and no Gateway `/capture`, `/seed`, or `/session/end` passthrough.
 
 ### Visualizer access auth note
 

@@ -36,6 +36,7 @@ const requiredCommands = [
 const requiredEnvVars = [
   "TDAI_VIS_DATA_DIR",
   "TDAI_VIS_OFFLOAD_ROOT",
+  "TDAI_VIS_DATA_SOURCE",
   "TDAI_VIS_GATEWAY_URL",
   "TDAI_VIS_GATEWAY_API_KEY",
   "TDAI_VIS_API_KEY",
