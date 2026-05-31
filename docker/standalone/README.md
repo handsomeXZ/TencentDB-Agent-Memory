@@ -7,7 +7,8 @@ The standalone config uses OpenRouter embeddings with `qwen/qwen3-embedding-8b` 
 ## Files
 
 - `Dockerfile`: Node 22.16 Gateway-only image pinned to GitHub tag `v1.0.0-beta.1` and verified against commit `36b0537676dc31b7b1a61f23521303c9a148b509`.
-- `docker-compose.yml`: Gateway service, read-only visualizer sidecar, shared data volume, config mount, port mappings, and healthchecks.
+- `docker-compose.yml`: local build-from-source Gateway service, read-only visualizer sidecar, shared data volume, config mount, port mappings, and healthchecks.
+- `docker-compose.ghcr.yml`: GHCR-based Gateway plus read-only visualizer sidecar using published images instead of local build contexts.
 - `tdai-gateway.standalone.yaml`: Gateway, data, LLM, and OpenRouter embedding config.
 - `.env.example`: Secret-safe template. Copy it to `.env.local` before running.
 
@@ -52,17 +53,22 @@ docker build -t tdai-memory-gateway:1.0.0-beta.1 .
 
 ## Publish To GHCR
 
-The repository includes `.github/workflows/publish-ghcr.yml` for publishing the standalone Gateway image to GitHub Container Registry. It runs on pushes to `dev`, semantic version tags matching `v*.*.*`, and manual `workflow_dispatch` runs.
+The repository includes `.github/workflows/publish-ghcr.yml` for publishing the standalone Gateway image and the separate Memory Visualizer sidecar image to GitHub Container Registry. It runs on pushes to `dev`, semantic version tags matching `v*.*.*`, and manual `workflow_dispatch` runs.
 
-Published images use this path:
+Published images use these paths:
 
 ```text
 ghcr.io/<github-owner-lowercase>/tencentdb-agent-memory
+ghcr.io/<github-owner-lowercase>/tencentdb-agent-memory-visualizer
 ```
 
-Every workflow build pushes `latest` in addition to traceable tags:
+`ghcr.io/<owner>/tencentdb-agent-memory` is Gateway-only. It starts `tdai-gateway-entrypoint` and cannot emit the visualizer startup log because it does not run the visualizer process.
 
-- branch builds also push the branch tag, for example `main`.
+`ghcr.io/<owner>/tencentdb-agent-memory-visualizer` is the separate sidecar image. That container should log `Memory Visualizer listening on http://0.0.0.0:8421` during startup.
+
+Every workflow build pushes matching tags for both images:
+
+- branch builds also push the branch tag, for example `dev`.
 - version tag builds also push the Git tag, for example `v1.0.0`.
 - all builds push a commit tag, for example `sha-<commit>`.
 
@@ -80,6 +86,12 @@ docker build \
   -t ghcr.io/your_github_username/tencentdb-agent-memory:latest \
   docker/standalone
 docker push ghcr.io/your_github_username/tencentdb-agent-memory:latest
+
+docker build \
+  -f apps/memory-visualizer/Dockerfile \
+  -t ghcr.io/your_github_username/tencentdb-agent-memory-visualizer:latest \
+  apps/memory-visualizer
+docker push ghcr.io/your_github_username/tencentdb-agent-memory-visualizer:latest
 ```
 
 `GHCR_TOKEN` needs `write:packages` permission. If a deployment platform cannot pull the image, make the GitHub Package public or configure GHCR pull credentials there.
@@ -94,6 +106,21 @@ docker compose up -d
 The default compose publish is `127.0.0.1:8420:8420`, so the Gateway listens on `http://127.0.0.1:8420` by default and stores data in the named Docker volume `tdai_memory_data`, mounted read-write at `/data/memory-tdai` inside the Gateway container.
 
 The compose file also starts `tdai-visualizer` on `http://127.0.0.1:8421`. It mounts the same `tdai_memory_data` volume read-only at `/data/memory-tdai:ro`, sets `TDAI_VIS_DATA_DIR=/data/memory-tdai` and `TDAI_VIS_OFFLOAD_ROOT=/data/memory-tdai/offload`, and serves the dashboard plus read-only `/api/*` endpoints from one Node process. It does not run the Vite development server.
+
+To run from published GHCR images instead of local build contexts:
+
+```bash
+cd docker/standalone
+docker compose -f docker-compose.ghcr.yml pull
+docker compose -f docker-compose.ghcr.yml up -d
+```
+
+`docker-compose.ghcr.yml` defaults `TDAI_GHCR_OWNER` to `handsomexz` and `TDAI_GHCR_TAG` to `latest`. Override them when you want a different owner or a branch, release, or `sha-<commit>` tag:
+
+```bash
+cd docker/standalone
+TDAI_GHCR_OWNER=your_github_username TDAI_GHCR_TAG=sha-<commit> docker compose -f docker-compose.ghcr.yml up -d
+```
 
 Gateway Search/Recall Debug proxying is disabled by default in the sidecar because recall and search can reveal memory contents. To opt in for a trusted local deployment, add `TDAI_VIS_GATEWAY_URL=http://tdai-gateway:8420` to the `tdai-visualizer` environment and add `TDAI_VIS_GATEWAY_API_KEY=${TDAI_GATEWAY_API_KEY:-}` only when the Gateway requires the bearer token. The visualizer still allows only fixed read/query debug endpoints and no `/capture`, `/seed`, or `/session/end` passthrough.
 
@@ -158,6 +185,19 @@ cd docker/standalone
 docker compose logs -f tdai-gateway
 docker compose logs -f tdai-visualizer
 docker compose down
+```
+
+The visualizer startup log belongs in the `tdai-visualizer` container logs, not the Gateway logs:
+
+```bash
+cd docker/standalone
+docker compose -f docker-compose.ghcr.yml logs tdai-visualizer
+```
+
+Look for:
+
+```text
+Memory Visualizer listening on http://0.0.0.0:8421
 ```
 
 To remove the persisted memory volume as well:
