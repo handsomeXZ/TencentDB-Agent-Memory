@@ -50,6 +50,40 @@ cd docker/standalone
 docker build -t tdai-memory-gateway:1.0.0-beta.1 .
 ```
 
+## Publish To GHCR
+
+The repository includes `.github/workflows/publish-ghcr.yml` for publishing the standalone Gateway image to GitHub Container Registry. It runs on pushes to `main`, semantic version tags matching `v*.*.*`, and manual `workflow_dispatch` runs.
+
+Published images use this path:
+
+```text
+ghcr.io/<github-owner-lowercase>/tencentdb-agent-memory
+```
+
+Every workflow build pushes `latest` in addition to traceable tags:
+
+- branch builds also push the branch tag, for example `main`.
+- version tag builds also push the Git tag, for example `v1.0.0`.
+- all builds push a commit tag, for example `sha-<commit>`.
+
+The workflow builds from the triggering repository and commit, so forks publish their own GHCR image under the fork owner. GitHub repository and organization names are normalized to lowercase for Docker compatibility.
+
+Manual local publish example:
+
+```bash
+echo "$GHCR_TOKEN" | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password-stdin
+docker build \
+  --build-arg TDAI_REPO=https://github.com/YOUR_GITHUB_USERNAME/TencentDB-Agent-Memory.git \
+  --build-arg TDAI_RELEASE_TAG=$(git rev-parse HEAD) \
+  --build-arg TDAI_RELEASE_COMMIT=$(git rev-parse HEAD) \
+  -f docker/standalone/Dockerfile \
+  -t ghcr.io/your_github_username/tencentdb-agent-memory:latest \
+  docker/standalone
+docker push ghcr.io/your_github_username/tencentdb-agent-memory:latest
+```
+
+`GHCR_TOKEN` needs `write:packages` permission. If a deployment platform cannot pull the image, make the GitHub Package public or configure GHCR pull credentials there.
+
 ## Run
 
 ```bash
