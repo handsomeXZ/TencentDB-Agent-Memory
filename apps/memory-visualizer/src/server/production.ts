@@ -59,7 +59,12 @@ export function readListenOptions(env: NodeJS.ProcessEnv = process.env): Visuali
   return { host, port };
 }
 
-async function routeRequest(apiServer: Server, staticRoot: string, request: IncomingMessage, response: ServerResponse): Promise<void> {
+async function routeRequest(
+  apiServer: Server,
+  staticRoot: string,
+  request: IncomingMessage,
+  response: ServerResponse,
+): Promise<void> {
   const requestUrl = new URL(request.url ?? "/", `http://${request.headers.host ?? "localhost"}`);
   const method = request.method?.toUpperCase() ?? "GET";
 
