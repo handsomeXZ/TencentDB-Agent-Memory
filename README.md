@@ -274,6 +274,8 @@ If you want a standalone local service, the compose setup in [`docker/standalone
 
 The visualizer mounts the same memory data read-only, serves a local dashboard plus read-only `/api/*` endpoints, and is meant for white-box inspection rather than operating the memory system. See [`apps/memory-visualizer/README.md`](./apps/memory-visualizer/README.md) for its local-only, read-only boundary and data source details.
 
+For GHCR-based deployment, `ghcr.io/<owner>/tencentdb-agent-memory` is Gateway-only and `ghcr.io/<owner>/tencentdb-agent-memory-visualizer` is the separate read-only sidecar image. The visualizer startup log `Memory Visualizer listening on http://0.0.0.0:8421` should appear in the visualizer container logs, not the Gateway container logs.
+
 ## 🔒 Gateway Security (optional)
 
 The Gateway listens on `:8420` and exposes capture / search / recall HTTP endpoints. Two opt-in switches let you turn it from "open localhost sidecar" into "authenticated network service". **Both default to off so existing deployments keep working unchanged.**

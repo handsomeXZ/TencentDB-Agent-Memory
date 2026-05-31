@@ -278,6 +278,8 @@ docker exec -it hermes-memory hermes
 
 Visualizer 会以只读方式挂载同一份 memory 数据，提供本地 dashboard 与只读 `/api/*` 接口，适合做白盒检查，不负责操作记忆系统。更多本地只读边界与数据源说明见 [`apps/memory-visualizer/README.md`](./apps/memory-visualizer/README.md)。
 
+如果使用 GHCR 部署，需要注意 `ghcr.io/<owner>/tencentdb-agent-memory` 仅包含 Gateway；只读 visualizer 会作为独立 sidecar 镜像 `ghcr.io/<owner>/tencentdb-agent-memory-visualizer` 运行。启动日志 `Memory Visualizer listening on http://0.0.0.0:8421` 应该出现在 visualizer 容器日志里，而不是 Gateway 容器日志里。
+
 ## 🔒 Gateway 安全配置（可选）
 
 Gateway 监听 `:8420`，对外提供 capture / search / recall 的 HTTP 接口。新增两个开关，可以把它从“开放的本地 sidecar”切换为“需要鉴权的网络服务”。**两个开关默认都关闭，已有部署的行为不变。**
