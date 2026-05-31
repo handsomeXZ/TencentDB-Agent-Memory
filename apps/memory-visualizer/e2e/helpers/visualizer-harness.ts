@@ -32,6 +32,7 @@ export interface VisualizerHarnessOptions {
   readonly offloadRootPath?: string;
   readonly gatewayBaseUrl?: string | null;
   readonly gatewayFetch?: GatewayFetch;
+  readonly visualizerApiKey?: string;
 }
 
 export async function startVisualizerHarness(options: VisualizerHarnessOptions = {}): Promise<VisualizerHarness> {
@@ -41,6 +42,7 @@ export async function startVisualizerHarness(options: VisualizerHarnessOptions =
       offloadRootPath: options.offloadRootPath ?? join(options.dataDir ?? completeDataDir, "offload"),
       gatewayBaseUrl: options.gatewayBaseUrl ?? null,
     },
+    env: options.visualizerApiKey ? { TDAI_VIS_API_KEY: options.visualizerApiKey } : undefined,
     fetch: options.gatewayFetch,
   });
   await listenServer(apiServer);
