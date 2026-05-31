@@ -48,6 +48,10 @@ Primary data source env vars:
 - `TDAI_VIS_GATEWAY_URL`
 - `TDAI_VIS_GATEWAY_API_KEY`
 
+Visualizer access auth env var:
+
+- `TDAI_VIS_API_KEY`
+
 Data source priority is request or UI path, then environment variables, then app-local config, then empty state and default examples.
 
 Read-only boundary summary:
@@ -62,4 +66,13 @@ Read-only boundary summary:
 
 Gateway `/search/*` is debug text, not structured primary data. The Docker sidecar disables Gateway debug proxying by default; leave `TDAI_VIS_GATEWAY_URL` unset unless a trusted operator explicitly opts in to the fixed read/query debug endpoints. For fuller scope, boundaries, supported views, privacy guidance, and the official replacement plan, see [`../../docs/visualization-web.md`](../../docs/visualization-web.md).
 
-For server access, put HTTPS and authentication in front of the visualizer with a reverse proxy, VPN, or allow-list. Do not expose the Gateway write-capable `8420` port publicly just to view this dashboard.
+For visualizer access, `TDAI_VIS_API_KEY` is optional and unset by default so existing local-only usage keeps working unchanged. When it is set, `GET /health` stays open, the production static SPA pages and assets still load so the browser can show the login screen, and every read-only `/api/*` route continues to require `Authorization: Bearer <key>`. Missing or wrong API tokens return HTTP 401 from `/api/*`, and the browser UI prompts for the shared key, stores it in `sessionStorage` for the current tab, and attaches `Authorization: Bearer <key>` to subsequent dashboard requests until logout clears that session value.
+
+Example protected API request:
+
+```bash
+curl -H "Authorization: Bearer $TDAI_VIS_API_KEY" \
+     http://127.0.0.1:8421/api/snapshot
+```
+
+`GET /health` stays open without a token for health checks. `TDAI_VIS_API_KEY` is still a shared Bearer-token gate rather than a multi-user auth backend; the login screen only lets a browser reuse that same shared secret for `/api/*`. For remote browser access, still put HTTPS and any operator-facing authentication or allow-list in front of the visualizer. Do not expose the Gateway write-capable `8420` port publicly just to view this dashboard.

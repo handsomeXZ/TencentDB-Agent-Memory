@@ -50,7 +50,7 @@ curl http://127.0.0.1:8421/health
 docker compose -f docker-compose.ghcr.yml up -d tdai-gateway tdai-visualizer
 ```
 
-Use `http://127.0.0.1:8421` for local inspection. For remote browser access, put a reverse proxy, VPN, or allow-list in front of the visualizer and add authentication there. Do not expose the Gateway write-capable `8420` port to the public internet for dashboard access.
+Use `http://127.0.0.1:8421` for local inspection. `TDAI_VIS_API_KEY` is optional and unset by default so existing local-only usage keeps working unchanged. When it is set, `GET /health` stays open, the production SPA shell and static assets still load, and every read-only `/api/*` route requires `Authorization: Bearer <key>`. The browser then shows a login form, validates the shared key by calling normal dashboard APIs, stores it in `sessionStorage` for that tab only, and clears it on logout. For remote browser access, still put HTTPS and any operator-facing authentication or allow-list in front of the visualizer because this is only a shared Bearer-token gate, not a multi-user login UI. Do not expose the Gateway write-capable `8420` port to the public internet for dashboard access.
 
 In GHCR deployments, `ghcr.io/<owner>/tencentdb-agent-memory` remains Gateway-only. The visualizer runs as the separate `ghcr.io/<owner>/tencentdb-agent-memory-visualizer` sidecar, and the expected startup log `Memory Visualizer listening on http://0.0.0.0:8421` belongs to the visualizer container logs.
 
@@ -75,8 +75,9 @@ The primary visualizer environment variable names are:
 - `TDAI_VIS_OFFLOAD_ROOT`
 - `TDAI_VIS_GATEWAY_URL`
 - `TDAI_VIS_GATEWAY_API_KEY`
+- `TDAI_VIS_API_KEY`
 
-Use `TDAI_VIS_DATA_DIR` for the memory root, `TDAI_VIS_OFFLOAD_ROOT` for offload files when they live outside the default root layout, `TDAI_VIS_GATEWAY_URL` for explicit opt-in debug connectivity, and `TDAI_VIS_GATEWAY_API_KEY` only when the local Gateway requires a bearer token. The Docker sidecar leaves `TDAI_VIS_GATEWAY_URL` unset by default so Search/Recall Debug degrades to disabled instead of proxying recall or search through a reverse proxy accidentally.
+Use `TDAI_VIS_DATA_DIR` for the memory root, `TDAI_VIS_OFFLOAD_ROOT` for offload files when they live outside the default root layout, `TDAI_VIS_GATEWAY_URL` for explicit opt-in debug connectivity, and `TDAI_VIS_GATEWAY_API_KEY` only when the local Gateway requires a bearer token. `TDAI_VIS_API_KEY` is the visualizer's own optional shared Bearer-token gate. Leave it unset for local-only defaults, or set it when you want every read-only `/api/*` route except `GET /health` to require `Authorization: Bearer <key>`, while static SPA assets stay public for the login screen. The Docker sidecar leaves `TDAI_VIS_GATEWAY_URL` unset by default so Search/Recall Debug degrades to disabled instead of proxying recall or search through a reverse proxy accidentally.
 
 ### Expected local layout
 
@@ -108,6 +109,19 @@ Each layer reports a capability status of `available`, `missing`, `partial`, `er
 ### Gateway debug note
 
 Gateway integration is optional and debug-only in this app. `GET /health`, recall checks, and `/search/*` responses are for diagnostics. Gateway `/search/*` output is raw formatted debug text, not structured primary data, and the visualizer should not treat it as the canonical source of records or conversations. The standalone Docker sidecar disables this proxy path by default; to opt in, set `TDAI_VIS_GATEWAY_URL=http://tdai-gateway:8420` and, when auth is enabled, `TDAI_VIS_GATEWAY_API_KEY` in a trusted deployment. The server still exposes only the fixed read/query debug endpoints and no Gateway `/capture`, `/seed`, or `/session/end` passthrough.
+
+### Visualizer access auth note
+
+Visualizer access auth is optional and unset by default. When `TDAI_VIS_API_KEY` is set, `GET /health` stays open and the production static SPA pages continue loading so the browser can render a login screen, but every read-only `/api/*` endpoint still requires `Authorization: Bearer <key>`. Missing or wrong API tokens return HTTP 401 from `/api/*`, the browser login shows a clear error, and no dashboard data renders until the shared key is accepted.
+
+Example protected API request:
+
+```bash
+curl -H "Authorization: Bearer $TDAI_VIS_API_KEY" \
+     http://127.0.0.1:8421/api/snapshot
+```
+
+`GET /health` stays open without a token for health checks. `TDAI_VIS_API_KEY` remains a shared Bearer-token gate rather than a new auth backend: the browser login simply reuses that shared secret for protected `/api/*` calls. Remote browser access still needs HTTPS and any operator-facing authentication or allow-list in front of the visualizer.
 
 ### Privacy guidance
 
@@ -150,7 +164,7 @@ These views are about inspection and debugging. They summarize what exists in lo
 ## Limitations
 
 - Local-only by default. Docker sidecar access is intended for trusted operators inspecting their own memory volume, not as a remote multi-user product.
-- No authentication or remote multi-user product scope.
+- No multi-user login UI or remote multi-user product scope. `TDAI_VIS_API_KEY` is only an optional shared Bearer-token gate.
 - No write-based memory management.
 - No edit, delete, reindex, capture, seed, or session-end actions in the UI.
 - Gateway `/search/*` is debug text and may not match the structured file-backed snapshot exactly.
