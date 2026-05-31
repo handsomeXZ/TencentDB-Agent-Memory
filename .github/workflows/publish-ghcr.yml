@@ -13,7 +13,8 @@ permissions:
   packages: write
 
 env:
-  IMAGE_NAME: tencentdb-agent-memory
+  GATEWAY_IMAGE_NAME: tencentdb-agent-memory
+  VISUALIZER_IMAGE_NAME: tencentdb-agent-memory-visualizer
 
 jobs:
   publish:
@@ -36,18 +37,18 @@ jobs:
         shell: bash
         run: echo "IMAGE_OWNER_LC=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_ENV"
 
-      - name: Docker metadata
-        id: meta
+      - name: Gateway metadata
+        id: gateway-meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ env.IMAGE_OWNER_LC }}/${{ env.IMAGE_NAME }}
+          images: ghcr.io/${{ env.IMAGE_OWNER_LC }}/${{ env.GATEWAY_IMAGE_NAME }}
           tags: |
             type=raw,value=latest
             type=ref,event=branch
             type=ref,event=tag
             type=sha,prefix=sha-
 
-      - name: Build and push
+      - name: Build and push Gateway
         uses: docker/build-push-action@v6
         with:
           context: ./docker/standalone
@@ -58,5 +59,26 @@ jobs:
             TDAI_REPO=https://github.com/${{ github.repository }}.git
             TDAI_RELEASE_TAG=${{ github.sha }}
             TDAI_RELEASE_COMMIT=${{ github.sha }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.gateway-meta.outputs.tags }}
+          labels: ${{ steps.gateway-meta.outputs.labels }}
+
+      - name: Visualizer metadata
+        id: visualizer-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ env.IMAGE_OWNER_LC }}/${{ env.VISUALIZER_IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
+            type=ref,event=branch
+            type=ref,event=tag
+            type=sha,prefix=sha-
+
+      - name: Build and push Visualizer
+        uses: docker/build-push-action@v6
+        with:
+          context: ./apps/memory-visualizer
+          file: ./apps/memory-visualizer/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.visualizer-meta.outputs.tags }}
+          labels: ${{ steps.visualizer-meta.outputs.labels }}
