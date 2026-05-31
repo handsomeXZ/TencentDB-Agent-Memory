@@ -33,6 +33,8 @@ services:
     image: tdai-memory-visualizer:1.0.0-beta.1
     container_name: tdai-memory-visualizer
     restart: unless-stopped
+    env_file:
+      - .env.local
     environment:
       NODE_ENV: production
       TDAI_VIS_HOST: 0.0.0.0

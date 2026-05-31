@@ -27,6 +27,8 @@ services:
     image: ghcr.io/${TDAI_GHCR_OWNER:-handsomexz}/tencentdb-agent-memory-visualizer:${TDAI_GHCR_TAG:-latest}
     container_name: tdai-memory-visualizer
     restart: unless-stopped
+    env_file:
+      - .env.local
     environment:
       NODE_ENV: production
       TDAI_VIS_HOST: 0.0.0.0
