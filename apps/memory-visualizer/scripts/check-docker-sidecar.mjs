@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 const appRoot = fileURLToPath(new URL("..", import.meta.url));
 const repoRoot = path.resolve(appRoot, "..", "..");
 const composePath = path.join(repoRoot, "docker", "standalone", "docker-compose.yml");
+const ghcrComposePath = path.join(repoRoot, "docker", "standalone", "docker-compose.ghcr.yml");
 const dockerfilePath = path.join(appRoot, "Dockerfile");
 
 const requiredComposeSnippets = [
@@ -14,6 +15,19 @@ const requiredComposeSnippets = [
   "context: ../../apps/memory-visualizer",
   "dockerfile: Dockerfile",
   "image: tdai-memory-visualizer:1.0.0-beta.1",
+  "TDAI_VIS_DATA_DIR: /data/memory-tdai",
+  "TDAI_VIS_OFFLOAD_ROOT: /data/memory-tdai/offload",
+  "127.0.0.1:8421:8421",
+  "127.0.0.1:8420:8420",
+  "tdai_memory_data:/data/memory-tdai:ro",
+  "condition: service_healthy",
+];
+
+const requiredGhcrComposeSnippets = [
+  "tdai-gateway:",
+  "tdai-visualizer:",
+  "ghcr.io/${TDAI_GHCR_OWNER:-handsomexz}/tencentdb-agent-memory:${TDAI_GHCR_TAG:-latest}",
+  "ghcr.io/${TDAI_GHCR_OWNER:-handsomexz}/tencentdb-agent-memory-visualizer:${TDAI_GHCR_TAG:-latest}",
   "TDAI_VIS_DATA_DIR: /data/memory-tdai",
   "TDAI_VIS_OFFLOAD_ROOT: /data/memory-tdai/offload",
   "127.0.0.1:8421:8421",
@@ -42,34 +56,18 @@ function requireSnippet(label, text, snippet, failures) {
 }
 
 async function main() {
-  const [composeText, dockerfileText] = await Promise.all([
+  const [composeText, ghcrComposeText, dockerfileText] = await Promise.all([
     readFile(composePath, "utf8"),
+    readFile(ghcrComposePath, "utf8"),
     readFile(dockerfilePath, "utf8"),
   ]);
 
   const failures = [];
   for (const snippet of requiredComposeSnippets) requireSnippet("compose sidecar", composeText, snippet, failures);
+  for (const snippet of requiredGhcrComposeSnippets) requireSnippet("GHCR compose sidecar", ghcrComposeText, snippet, failures);
   for (const snippet of requiredDockerfileSnippets) requireSnippet("visualizer Dockerfile", dockerfileText, snippet, failures);
-  const gatewayBlock = readServiceBlock(composeText, "tdai-gateway");
-  const visualizerBlock = readServiceBlock(composeText, "tdai-visualizer");
-
-  if (gatewayBlock === null) {
-    failures.push("compose missing tdai-gateway service");
-  } else {
-    const gatewayPorts = readPortMappings(gatewayBlock);
-    if (!gatewayPorts.includes("127.0.0.1:8420:8420")) {
-      failures.push("compose Gateway must publish exactly 127.0.0.1:8420:8420");
-    }
-    for (const port of gatewayPorts.filter(isGateway8420Mapping)) {
-      if (port !== "127.0.0.1:8420:8420") {
-        failures.push(`compose Gateway must not publish public or non-loopback 8420 binding: ${port}`);
-      }
-    }
-  }
-
-  if (visualizerBlock?.includes("TDAI_VIS_GATEWAY_URL") || visualizerBlock?.includes("TDAI_VIS_GATEWAY_API_KEY")) {
-    failures.push("compose visualizer must not enable Gateway debug proxy by default; set TDAI_VIS_GATEWAY_URL explicitly when needed");
-  }
+  validateCompose("compose", composeText, failures);
+  validateCompose("GHCR compose", ghcrComposeText, failures);
 
   if (dockerfileText.includes("TDAI_VIS_GATEWAY_URL")) {
     failures.push("visualizer Dockerfile must not enable Gateway debug proxy by default");
@@ -93,6 +91,46 @@ async function main() {
   }
 
   console.log("Docker sidecar checks passed.");
+}
+
+function validateCompose(label, composeText, failures) {
+  const gatewayBlock = readServiceBlock(composeText, "tdai-gateway");
+  const visualizerBlock = readServiceBlock(composeText, "tdai-visualizer");
+
+  if (gatewayBlock === null) {
+    failures.push(`${label} missing tdai-gateway service`);
+  } else {
+    const gatewayPorts = readPortMappings(gatewayBlock);
+    if (!gatewayPorts.includes("127.0.0.1:8420:8420")) {
+      failures.push(`${label} Gateway must publish exactly 127.0.0.1:8420:8420`);
+    }
+    for (const port of gatewayPorts.filter(isGateway8420Mapping)) {
+      if (port !== "127.0.0.1:8420:8420") {
+        failures.push(`${label} Gateway must not publish public or non-loopback 8420 binding: ${port}`);
+      }
+    }
+  }
+
+  if (visualizerBlock === null) {
+    failures.push(`${label} missing tdai-visualizer service`);
+  } else {
+    const visualizerPorts = readPortMappings(visualizerBlock);
+    if (!visualizerPorts.includes("127.0.0.1:8421:8421")) {
+      failures.push(`${label} visualizer must publish exactly 127.0.0.1:8421:8421`);
+    }
+    for (const port of visualizerPorts.filter(isVisualizer8421Mapping)) {
+      if (port !== "127.0.0.1:8421:8421") {
+        failures.push(`${label} visualizer must not publish public or non-loopback 8421 binding: ${port}`);
+      }
+    }
+    if (/tdai_memory_data:\/data\/memory-tdai(?!:ro)/.test(visualizerBlock)) {
+      failures.push(`${label} visualizer must mount tdai_memory_data read-only`);
+    }
+  }
+
+  if (visualizerBlock?.includes("TDAI_VIS_GATEWAY_URL") || visualizerBlock?.includes("TDAI_VIS_GATEWAY_API_KEY")) {
+    failures.push(`${label} visualizer must not enable Gateway debug proxy by default; set TDAI_VIS_GATEWAY_URL explicitly when needed`);
+  }
 }
 
 function readServiceBlock(composeText, serviceName) {
@@ -132,6 +170,11 @@ function readPortMappings(serviceBlock) {
 function isGateway8420Mapping(mapping) {
   const normalized = mapping.replace(/\/tcp$/i, "");
   return normalized === "8420" || normalized.endsWith(":8420") || normalized.includes(":8420:");
+}
+
+function isVisualizer8421Mapping(mapping) {
+  const normalized = mapping.replace(/\/tcp$/i, "");
+  return normalized === "8421" || normalized.endsWith(":8421") || normalized.includes(":8421:");
 }
 
 main().catch((error) => {
