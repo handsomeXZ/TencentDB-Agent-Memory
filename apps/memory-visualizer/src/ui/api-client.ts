@@ -45,6 +45,10 @@ export interface DashboardApiClient {
   readonly runGatewayConversationSearchDebug: (config: SourceQueryConfig, body: GatewayConversationSearchRequest) => Promise<GatewayDebugPayload<ConversationSearchDebugData>>;
 }
 
+export interface DashboardApiClientOptions {
+  readonly getApiKey?: () => string | undefined;
+}
+
 export interface PageRequest {
   readonly offset?: number;
   readonly limit?: number;
@@ -74,18 +78,34 @@ interface ErrorPayload {
   readonly code?: string;
 }
 
-export function createDashboardApiClient(baseUrl = ""): DashboardApiClient {
+export class DashboardApiError extends Error {
+  public readonly status: number;
+  public readonly code: string | null;
+
+  public constructor(message: string, status: number, code: string | null) {
+    super(message);
+    this.name = "DashboardApiError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
+export function isDashboardAuthError(error: unknown): boolean {
+  return error instanceof DashboardApiError && error.status === 401 && error.code === "unauthorized";
+}
+
+export function createDashboardApiClient(baseUrl = "", options: DashboardApiClientOptions = {}): DashboardApiClient {
   return {
-    getSnapshot: (config) => fetchJson<DashboardSnapshot>(buildApiUrl(baseUrl, "/api/snapshot", config)),
-    getScenes: (config) => fetchJson<DashboardPage<SceneBlockSummary>>(buildApiUrl(baseUrl, "/api/scenes", config)),
-    getMemories: (config, page) => fetchJson<DashboardPage<StructuredMemorySummary>>(buildApiUrl(baseUrl, "/api/memories", config, page)),
-    getEvidence: (config, page) => fetchJson<DashboardPage<EvidenceLinkIndexEntry>>(buildApiUrl(baseUrl, "/api/evidence", config, page)),
-    getConversations: (config, page) => fetchJson<DashboardPage<ConversationEvidence>>(buildApiUrl(baseUrl, "/api/conversations", config, page)),
-    getOffload: (config) => fetchJson<OffloadResponse>(buildApiUrl(baseUrl, "/api/offload", config)),
-    getGatewayHealth: (config) => fetchJson<GatewayDebugPayload<HealthDebugData>>(buildApiUrl(baseUrl, "/api/gateway/health", config)),
-    runGatewayRecallDebug: (config, body) => postJson<GatewayDebugPayload<RecallDebugData>>(buildApiUrl(baseUrl, "/api/gateway/recall-debug", config), body),
-    runGatewayMemorySearchDebug: (config, body) => postJson<GatewayDebugPayload<MemorySearchDebugData>>(buildApiUrl(baseUrl, "/api/gateway/search-memories-debug", config), body),
-    runGatewayConversationSearchDebug: (config, body) => postJson<GatewayDebugPayload<ConversationSearchDebugData>>(buildApiUrl(baseUrl, "/api/gateway/search-conversations-debug", config), body),
+    getSnapshot: (config) => fetchJson<DashboardSnapshot>(buildApiUrl(baseUrl, "/api/snapshot", config), options),
+    getScenes: (config) => fetchJson<DashboardPage<SceneBlockSummary>>(buildApiUrl(baseUrl, "/api/scenes", config), options),
+    getMemories: (config, page) => fetchJson<DashboardPage<StructuredMemorySummary>>(buildApiUrl(baseUrl, "/api/memories", config, page), options),
+    getEvidence: (config, page) => fetchJson<DashboardPage<EvidenceLinkIndexEntry>>(buildApiUrl(baseUrl, "/api/evidence", config, page), options),
+    getConversations: (config, page) => fetchJson<DashboardPage<ConversationEvidence>>(buildApiUrl(baseUrl, "/api/conversations", config, page), options),
+    getOffload: (config) => fetchJson<OffloadResponse>(buildApiUrl(baseUrl, "/api/offload", config), options),
+    getGatewayHealth: (config) => fetchJson<GatewayDebugPayload<HealthDebugData>>(buildApiUrl(baseUrl, "/api/gateway/health", config), options),
+    runGatewayRecallDebug: (config, body) => postJson<GatewayDebugPayload<RecallDebugData>>(buildApiUrl(baseUrl, "/api/gateway/recall-debug", config), body, options),
+    runGatewayMemorySearchDebug: (config, body) => postJson<GatewayDebugPayload<MemorySearchDebugData>>(buildApiUrl(baseUrl, "/api/gateway/search-memories-debug", config), body, options),
+    runGatewayConversationSearchDebug: (config, body) => postJson<GatewayDebugPayload<ConversationSearchDebugData>>(buildApiUrl(baseUrl, "/api/gateway/search-conversations-debug", config), body, options),
   };
 }
 
@@ -134,51 +154,57 @@ function buildApiUrl(baseUrl: string, pathname: string, config: SourceQueryConfi
   return query ? `${baseUrl}${pathname}?${query}` : `${baseUrl}${pathname}`;
 }
 
-async function fetchJson<T>(url: string): Promise<T> {
+async function fetchJson<T>(url: string, options: DashboardApiClientOptions): Promise<T> {
   const response = await fetch(url, {
-    headers: {
-      Accept: "application/json",
-    },
+    headers: buildRequestHeaders(options, { Accept: "application/json" }),
   });
 
   if (!response.ok) {
+    const payload = await readErrorPayload(response);
     let detail = `${response.status} ${response.statusText}`.trim();
-    try {
-      const payload = (await response.json()) as ErrorPayload;
-      if (payload.error) detail = payload.error;
-      if (payload.code) detail = `${detail} (${payload.code})`;
-    } catch {
-      // Keep the HTTP detail when the error body is not JSON.
-    }
-    throw new Error(detail);
+    if (payload.error) detail = payload.error;
+    if (payload.code) detail = `${detail} (${payload.code})`;
+    throw new DashboardApiError(detail, response.status, payload.code ?? null);
   }
 
   return (await response.json()) as T;
 }
 
-async function postJson<T>(url: string, body: object): Promise<T> {
+async function postJson<T>(url: string, body: object, options: DashboardApiClientOptions): Promise<T> {
   const response = await fetch(url, {
     method: "POST",
-    headers: {
+    headers: buildRequestHeaders(options, {
       Accept: "application/json",
       "Content-Type": "application/json",
-    },
+    }),
     body: JSON.stringify(body),
   });
 
   if (!response.ok) {
+    const payload = await readErrorPayload(response);
     let detail = `${response.status} ${response.statusText}`.trim();
-    try {
-      const payload = (await response.json()) as ErrorPayload;
-      if (payload.error) detail = payload.error;
-      if (payload.code) detail = `${detail} (${payload.code})`;
-    } catch {
-      // Keep the HTTP detail when the error body is not JSON.
-    }
-    throw new Error(detail);
+    if (payload.error) detail = payload.error;
+    if (payload.code) detail = `${detail} (${payload.code})`;
+    throw new DashboardApiError(detail, response.status, payload.code ?? null);
   }
 
   return (await response.json()) as T;
+}
+
+function buildRequestHeaders(options: DashboardApiClientOptions, headers: Record<string, string>): Headers {
+  const requestHeaders = new Headers(headers);
+  const apiKey = options.getApiKey?.()?.trim();
+  if (apiKey) requestHeaders.set("Authorization", `Bearer ${apiKey}`);
+  return requestHeaders;
+}
+
+async function readErrorPayload(response: Response): Promise<ErrorPayload> {
+  try {
+    return (await response.json()) as ErrorPayload;
+  } catch (error) {
+    void error;
+    return {};
+  }
 }
 
 export function summarizeCapabilities(report: CapabilityReport): readonly string[] {

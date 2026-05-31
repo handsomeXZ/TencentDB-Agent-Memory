@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "./App";
 
 import type { DashboardSnapshot } from "../contracts/dashboard";
-import type { DashboardApiClient, EvidenceLinkIndexEntry, OffloadResponse } from "./api-client";
+import { DashboardApiError, type DashboardApiClient, type EvidenceLinkIndexEntry, type OffloadResponse } from "./api-client";
 import type { DashboardPage } from "../providers";
 
 describe("ui-shell App", () => {
@@ -20,6 +20,7 @@ describe("ui-shell App", () => {
     document.body.innerHTML = "";
     document.body.appendChild(container);
     window.history.replaceState({}, "", "/");
+    window.sessionStorage.clear();
     root = createRoot(container);
   });
 
@@ -71,11 +72,58 @@ describe("ui-shell App", () => {
     expect(textContent()).toContain("只读模式");
   });
 
-  async function renderApp(client: DashboardApiClient) {
+  it("shows login on unauthorized load, validates the shared key, and logs out cleanly", async () => {
+    const secret = "vis-test-secret-1234567890";
+    await renderApp(undefined, createAuthAwareClientFactory(createSnapshot(), secret));
+
+    expect(textContent()).toContain("输入共享访问密钥");
+    expect(textContent()).not.toContain("共享密钥已验证");
+
+    await changeInputByAriaLabel("共享访问密钥", "wrong-token");
+    await clickButton("登录并验证");
+
+    expect(textContent()).toContain("登录失败");
+    expect(textContent()).toContain("共享访问密钥无效，请检查后重试。");
+
+    await changeInputByAriaLabel("共享访问密钥", secret);
+    await clickButton("登录并验证");
+
+    expect(textContent()).toContain("共享密钥已验证");
+    expect(textContent()).toContain("退出登录");
+    expect(textContent()).toContain("总览");
+
+    await clickButton("退出登录");
+
+    expect(textContent()).toContain("输入共享访问密钥");
+    expect(textContent()).not.toContain("共享密钥已验证");
+  });
+
+  it("reuses a stored shared key when auth is required on reload", async () => {
+    const secret = "vis-test-secret-1234567890";
+    window.sessionStorage.setItem("tdai-memory-visualizer-api-key", secret);
+
+    await renderApp(undefined, createAuthAwareClientFactory(createSnapshot(), secret));
+
+    expect(textContent()).toContain("共享密钥已验证");
+    expect(textContent()).not.toContain("输入共享访问密钥");
+  });
+
+  it("clears a stored shared key when auth is not required", async () => {
+    window.sessionStorage.setItem("tdai-memory-visualizer-api-key", "stale-token");
+
+    await renderApp(createClient(createSnapshot(), false));
+
+    expect(textContent()).toContain("本地免登录");
+    expect(textContent()).not.toContain("共享密钥已验证");
+    expect(window.sessionStorage.getItem("tdai-memory-visualizer-api-key")).toBeNull();
+  });
+
+  async function renderApp(client?: DashboardApiClient, apiClientFactory?: (getApiKey: () => string | undefined) => DashboardApiClient) {
     await act(async () => {
-      root.render(<App apiClient={client} />);
+      root.render(<App apiClient={client} apiClientFactory={apiClientFactory} />);
     });
 
+    await flush();
     await flush();
     await flush();
   }
@@ -88,6 +136,34 @@ describe("ui-shell App", () => {
       link.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
     });
 
+    await flush();
+  }
+
+  async function changeInputByAriaLabel(label: string, value: string) {
+    const input = container.querySelector(`input[aria-label="${label}"]`);
+    if (!(input instanceof HTMLInputElement)) throw new Error(`Input not found: ${label}`);
+    const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value");
+    const setter = descriptor?.set;
+    if (!setter) throw new Error("HTMLInputElement value setter not found");
+
+    await act(async () => {
+      setter.call(input, value);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+
+    await flush();
+  }
+
+  async function clickButton(label: string) {
+    const button = [...container.querySelectorAll("button")].find((element) => element.textContent?.includes(label));
+    if (!(button instanceof HTMLButtonElement)) throw new Error(`Button not found: ${label}`);
+
+    await act(async () => {
+      button.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+    });
+
+    await flush();
     await flush();
   }
 
@@ -155,6 +231,58 @@ function createClient(snapshot: DashboardSnapshot, missingData: boolean): Dashbo
     runGatewayRecallDebug: async () => ({ ok: false, endpoint: "/recall", checkedAt: "2026-05-30T12:00:00.000Z", latencyMs: null, httpStatus: null, data: null, warning: "Gateway base URL is not configured." }),
     runGatewayMemorySearchDebug: async () => ({ ok: false, endpoint: "/search/memories", checkedAt: "2026-05-30T12:00:00.000Z", latencyMs: null, httpStatus: null, data: null, warning: "Gateway base URL is not configured." }),
     runGatewayConversationSearchDebug: async () => ({ ok: false, endpoint: "/search/conversations", checkedAt: "2026-05-30T12:00:00.000Z", latencyMs: null, httpStatus: null, data: null, warning: "Gateway base URL is not configured." }),
+  };
+}
+
+function createAuthAwareClientFactory(snapshot: DashboardSnapshot, secret: string): (getApiKey: () => string | undefined) => DashboardApiClient {
+  return (getApiKey) => {
+    const delegate = createClient(snapshot, false);
+    const assertKey = () => {
+      if (getApiKey() !== secret) throw new DashboardApiError("Unauthorized (unauthorized)", 401, "unauthorized");
+    };
+
+    return {
+      getSnapshot: async (config) => {
+        assertKey();
+        return delegate.getSnapshot(config);
+      },
+      getScenes: async (config) => {
+        assertKey();
+        return delegate.getScenes(config);
+      },
+      getMemories: async (config, page) => {
+        assertKey();
+        return delegate.getMemories(config, page);
+      },
+      getEvidence: async (config, page) => {
+        assertKey();
+        return delegate.getEvidence(config, page);
+      },
+      getConversations: async (config, page) => {
+        assertKey();
+        return delegate.getConversations(config, page);
+      },
+      getOffload: async (config) => {
+        assertKey();
+        return delegate.getOffload(config);
+      },
+      getGatewayHealth: async (config) => {
+        assertKey();
+        return delegate.getGatewayHealth(config);
+      },
+      runGatewayRecallDebug: async (config, body) => {
+        assertKey();
+        return delegate.runGatewayRecallDebug(config, body);
+      },
+      runGatewayMemorySearchDebug: async (config, body) => {
+        assertKey();
+        return delegate.runGatewayMemorySearchDebug(config, body);
+      },
+      runGatewayConversationSearchDebug: async (config, body) => {
+        assertKey();
+        return delegate.runGatewayConversationSearchDebug(config, body);
+      },
+    };
   };
 }
 

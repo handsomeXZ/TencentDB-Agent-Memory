@@ -1,11 +1,12 @@
 import mermaid from "mermaid";
-import { useEffect, useMemo, useState } from "react";
-import type { ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { FormEvent, ReactNode } from "react";
 
 import {
   buildSourceQueryString,
   createDashboardApiClient,
   createEmptySourceQueryConfig,
+  isDashboardAuthError,
   readSourceQueryConfig,
 } from "./api-client";
 import { createUiDashboardSummary } from "./dashboard-summary";
@@ -64,7 +65,19 @@ interface LocationState {
 
 interface AppProps {
   readonly apiClient?: DashboardApiClient;
+  readonly apiClientFactory?: (getApiKey: () => string | undefined) => DashboardApiClient;
 }
+
+interface DashboardLoadState {
+  readonly snapshotState: AsyncState<DashboardSnapshot>;
+  readonly sceneState: AsyncState<DashboardPage<SceneBlockSummary>>;
+  readonly memoryState: AsyncState<DashboardPage<StructuredMemorySummary>>;
+  readonly evidenceState: AsyncState<DashboardPage<EvidenceLinkIndexEntry>>;
+  readonly conversationState: AsyncState<DashboardPage<ConversationEvidence>>;
+  readonly offloadState: AsyncState<OffloadResponse>;
+}
+
+type AuthRequirement = "unknown" | "required" | "not-required";
 
 const ROUTES: readonly RouteDefinition[] = [
   { id: "overview", label: "总览", path: "/", detail: "查看只读健康状态、分层覆盖率与时间线背景。" },
@@ -83,8 +96,13 @@ const EMPTY_PAGE: DashboardPage<never> = {
   limit: 50,
 };
 
-export function App({ apiClient }: AppProps) {
-  const client = useMemo(() => apiClient ?? createDashboardApiClient(), [apiClient]);
+const VISUALIZER_API_KEY_STORAGE_KEY = "tdai-memory-visualizer-api-key";
+
+export function App({ apiClient, apiClientFactory }: AppProps) {
+  const clientFactory = useMemo(
+    () => apiClientFactory ?? ((getApiKey: () => string | undefined) => apiClient ?? createDashboardApiClient("", { getApiKey })),
+    [apiClient, apiClientFactory],
+  );
   const [locationState, setLocationState] = useState<LocationState>(() => readLocationState());
   const [formState, setFormState] = useState<SourceQueryConfig>(() => readSourceQueryConfig(locationState.search));
   const [snapshotState, setSnapshotState] = useState<AsyncState<DashboardSnapshot>>(loadingState());
@@ -93,6 +111,16 @@ export function App({ apiClient }: AppProps) {
   const [evidenceState, setEvidenceState] = useState<AsyncState<DashboardPage<EvidenceLinkIndexEntry>>>(loadingState());
   const [conversationState, setConversationState] = useState<AsyncState<DashboardPage<ConversationEvidence>>>(loadingState());
   const [offloadState, setOffloadState] = useState<AsyncState<OffloadResponse>>(loadingState());
+  const [authRequirement, setAuthRequirement] = useState<AuthRequirement>("unknown");
+  const [activeApiKey, setActiveApiKey] = useState<string | undefined>();
+  const [loginKey, setLoginKey] = useState("");
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [loginBusy, setLoginBusy] = useState(false);
+  const activeApiKeyRef = useRef(activeApiKey);
+
+  activeApiKeyRef.current = activeApiKey;
+
+  const client = useMemo(() => clientFactory(() => activeApiKeyRef.current), [clientFactory]);
 
   const sourceQuery = useMemo(() => readSourceQueryConfig(locationState.search), [locationState.search]);
   const activeRoute = useMemo(() => resolveRoute(locationState.path), [locationState.path]);
@@ -111,6 +139,14 @@ export function App({ apiClient }: AppProps) {
 
   useEffect(() => {
     let cancelled = false;
+    const storedApiKey = readStoredVisualizerApiKey();
+
+    if (authRequirement === "required" && !activeApiKey) {
+      clearDashboardState(setSnapshotState, setSceneState, setMemoryState, setEvidenceState, setConversationState, setOffloadState);
+      return () => {
+        cancelled = true;
+      };
+    }
 
     setSnapshotState(loadingState());
     setSceneState(loadingState());
@@ -120,23 +156,47 @@ export function App({ apiClient }: AppProps) {
     setOffloadState(loadingState());
 
     const update = async () => {
-      const [snapshot, scenes, memories, evidence, conversations, offload] = await Promise.allSettled([
-        client.getSnapshot(sourceQuery),
-        client.getScenes(sourceQuery),
-        client.getMemories(sourceQuery),
-        client.getEvidence(sourceQuery),
-        client.getConversations(sourceQuery),
-        client.getOffload(sourceQuery),
-      ]);
+      const result = await requestDashboardData(client, sourceQuery);
 
       if (cancelled) return;
 
-      setSnapshotState(toAsyncState(snapshot));
-      setSceneState(toAsyncState(scenes));
-      setMemoryState(toAsyncState(memories));
-      setEvidenceState(toAsyncState(evidence));
-      setConversationState(toAsyncState(conversations));
-      setOffloadState(toAsyncState(offload));
+      if (result === "unauthorized") {
+        if (!activeApiKey && authRequirement === "unknown" && storedApiKey) {
+          const storedClient = clientFactory(() => storedApiKey);
+          const storedResult = await requestDashboardData(storedClient, sourceQuery);
+
+          if (cancelled) return;
+
+          if (storedResult !== "unauthorized") {
+            setActiveApiKey(storedApiKey);
+            setAuthRequirement("required");
+            setLoginBusy(false);
+            setLoginError(null);
+            applyDashboardLoadResult(storedResult, setSnapshotState, setSceneState, setMemoryState, setEvidenceState, setConversationState, setOffloadState);
+            return;
+          }
+        }
+
+        clearStoredVisualizerApiKey();
+        setActiveApiKey(undefined);
+        setAuthRequirement("required");
+        setLoginBusy(false);
+        setLoginError(activeApiKey ? "共享访问密钥无效，请重新输入后再验证。" : "此 Memory Visualizer 已启用共享访问密钥，请先登录。");
+        clearDashboardState(setSnapshotState, setSceneState, setMemoryState, setEvidenceState, setConversationState, setOffloadState);
+        return;
+      }
+
+      applyDashboardLoadResult(result, setSnapshotState, setSceneState, setMemoryState, setEvidenceState, setConversationState, setOffloadState);
+      setLoginBusy(false);
+      setLoginError(null);
+
+      if (activeApiKey) {
+        setAuthRequirement("required");
+        return;
+      }
+
+      clearStoredVisualizerApiKey();
+      setAuthRequirement("not-required");
     };
 
     void update();
@@ -144,7 +204,7 @@ export function App({ apiClient }: AppProps) {
     return () => {
       cancelled = true;
     };
-  }, [client, sourceQuery]);
+  }, [activeApiKey, authRequirement, client, clientFactory, sourceQuery]);
 
   const statusModel = snapshotState.data ? createShellStatusModel(snapshotState.data) : null;
 
@@ -177,6 +237,93 @@ export function App({ apiClient }: AppProps) {
     applySourceSelection(createEmptySourceQueryConfig());
   };
 
+  const handleLoginSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const candidate = loginKey.trim();
+    if (candidate.length === 0) {
+      setLoginError("请输入共享访问密钥。");
+      return;
+    }
+
+    setLoginBusy(true);
+    setLoginError(null);
+
+    const temporaryClient = clientFactory(() => candidate);
+    const result = await requestDashboardData(temporaryClient, sourceQuery);
+
+    if (result === "unauthorized") {
+      setLoginBusy(false);
+      setLoginError("共享访问密钥无效，请检查后重试。");
+      clearStoredVisualizerApiKey();
+      return;
+    }
+
+    storeVisualizerApiKey(candidate);
+    setActiveApiKey(candidate);
+    setAuthRequirement("required");
+    setLoginKey("");
+    setLoginBusy(false);
+    setLoginError(null);
+    applyDashboardLoadResult(result, setSnapshotState, setSceneState, setMemoryState, setEvidenceState, setConversationState, setOffloadState);
+  };
+
+  const handleLogout = () => {
+    clearStoredVisualizerApiKey();
+    setActiveApiKey(undefined);
+    setAuthRequirement("required");
+    setLoginBusy(false);
+    setLoginKey("");
+    setLoginError(null);
+    clearDashboardState(setSnapshotState, setSceneState, setMemoryState, setEvidenceState, setConversationState, setOffloadState);
+  };
+
+  if (authRequirement === "required" && !activeApiKey) {
+    return (
+      <main className="app-shell">
+        <div className="shell-frame">
+          <ReadOnlyBanner />
+          <section className="hero-panel auth-hero-panel" aria-labelledby="visualizer-title">
+            <div className="hero-grid auth-hero-grid">
+              <div>
+                <div className="eyebrow">仅限本地的白盒可观测性</div>
+                <h1 id="visualizer-title" className="hero-heading">
+                  TencentDB Agent Memory Visualizer
+                </h1>
+                <p className="hero-copy">
+                  这个只读界面仍会先加载 SPA 外壳，但数据读取继续受 <span className="mono">TDAI_VIS_API_KEY</span> 保护。输入共享访问密钥后，浏览器会对所有 <span className="mono">/api/*</span> 请求附带 Bearer 头，并继续保持只读边界。
+                </p>
+              </div>
+              <form className="path-form auth-panel" onSubmit={handleLoginSubmit}>
+                <div className="eyebrow">访问验证</div>
+                <h2 className="section-title">输入共享访问密钥</h2>
+                <p className="field-hint">
+                  仅验证当前浏览器会话。退出登录会清除此会话缓存的密钥，不会改动任何本地 Memory 数据。
+                </p>
+                <label className="field">
+                  <span className="meta-label">共享访问密钥</span>
+                  <input
+                    aria-label="共享访问密钥"
+                    autoComplete="current-password"
+                    disabled={loginBusy}
+                    type="password"
+                    value={loginKey}
+                    onChange={(event) => setLoginKey(event.target.value)}
+                  />
+                </label>
+                {loginError ? <ErrorState title="登录失败" detail={loginError} /> : null}
+                <div className="form-actions auth-actions">
+                  <button className="button" disabled={loginBusy} type="submit">
+                    {loginBusy ? "验证中..." : "登录并验证"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </section>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="app-shell">
       <div className="shell-frame">
@@ -195,16 +342,27 @@ export function App({ apiClient }: AppProps) {
             <div className="shell-panel">
               <div className="eyebrow">使用提醒</div>
               <p className="metric-subtle">
-                 这个界面始终通过 <span className="mono">/api/*</span> 读取服务端 DTO。选择数据源只会改变本地只读查询，不表示会对本地数据做任何修改。
+                  这个界面始终通过 <span className="mono">/api/*</span> 读取服务端 DTO。选择数据源只会改变本地只读查询，不表示会对本地数据做任何修改。
               </p>
+              <div className="stack-row">
+                <span className="meta-label">访问模式</span>
+                <span>{activeApiKey ? "共享密钥已验证" : "本地免登录"}</span>
+              </div>
               <div className="stack-row">
                 <span className="meta-label">当前路由</span>
                 <span>{activeRoute.label}</span>
               </div>
               <div className="stack-row">
                 <span className="meta-label">数据源查询</span>
-                 <span className="mono">{buildSourceQueryString(sourceQuery) || "默认查询"}</span>
+                  <span className="mono">{buildSourceQueryString(sourceQuery) || "默认查询"}</span>
               </div>
+              {activeApiKey ? (
+                <div className="form-actions auth-actions">
+                  <button className="button" data-variant="ghost" type="button" onClick={handleLogout}>
+                    退出登录
+                  </button>
+                </div>
+              ) : null}
             </div>
           </div>
         </section>
@@ -1341,6 +1499,68 @@ function loadingState<T>(): AsyncState<T> {
   return { status: "loading", data: null, error: null };
 }
 
+function clearDashboardState(
+  setSnapshotState: (value: AsyncState<DashboardSnapshot>) => void,
+  setSceneState: (value: AsyncState<DashboardPage<SceneBlockSummary>>) => void,
+  setMemoryState: (value: AsyncState<DashboardPage<StructuredMemorySummary>>) => void,
+  setEvidenceState: (value: AsyncState<DashboardPage<EvidenceLinkIndexEntry>>) => void,
+  setConversationState: (value: AsyncState<DashboardPage<ConversationEvidence>>) => void,
+  setOffloadState: (value: AsyncState<OffloadResponse>) => void,
+): void {
+  setSnapshotState(readyState());
+  setSceneState(readyState());
+  setMemoryState(readyState());
+  setEvidenceState(readyState());
+  setConversationState(readyState());
+  setOffloadState(readyState());
+}
+
+async function requestDashboardData(client: DashboardApiClient, sourceQuery: SourceQueryConfig): Promise<DashboardLoadState | "unauthorized"> {
+  const [snapshot, scenes, memories, evidence, conversations, offload] = await Promise.allSettled([
+    client.getSnapshot(sourceQuery),
+    client.getScenes(sourceQuery),
+    client.getMemories(sourceQuery),
+    client.getEvidence(sourceQuery),
+    client.getConversations(sourceQuery),
+    client.getOffload(sourceQuery),
+  ]);
+
+  const settledResults: readonly PromiseSettledResult<unknown>[] = [snapshot, scenes, memories, evidence, conversations, offload];
+  if (settledResults.some((result) => isUnauthorizedResult(result))) {
+    return "unauthorized";
+  }
+
+  return {
+    snapshotState: toAsyncState(snapshot),
+    sceneState: toAsyncState(scenes),
+    memoryState: toAsyncState(memories),
+    evidenceState: toAsyncState(evidence),
+    conversationState: toAsyncState(conversations),
+    offloadState: toAsyncState(offload),
+  };
+}
+
+function applyDashboardLoadResult(
+  result: DashboardLoadState,
+  setSnapshotState: (value: AsyncState<DashboardSnapshot>) => void,
+  setSceneState: (value: AsyncState<DashboardPage<SceneBlockSummary>>) => void,
+  setMemoryState: (value: AsyncState<DashboardPage<StructuredMemorySummary>>) => void,
+  setEvidenceState: (value: AsyncState<DashboardPage<EvidenceLinkIndexEntry>>) => void,
+  setConversationState: (value: AsyncState<DashboardPage<ConversationEvidence>>) => void,
+  setOffloadState: (value: AsyncState<OffloadResponse>) => void,
+): void {
+  setSnapshotState(result.snapshotState);
+  setSceneState(result.sceneState);
+  setMemoryState(result.memoryState);
+  setEvidenceState(result.evidenceState);
+  setConversationState(result.conversationState);
+  setOffloadState(result.offloadState);
+}
+
+function isUnauthorizedResult<T>(result: PromiseSettledResult<T>): boolean {
+  return result.status === "rejected" && isDashboardAuthError(result.reason);
+}
+
 function toAsyncState<T>(result: PromiseSettledResult<T>): AsyncState<T> {
   if (result.status === "fulfilled") return { status: "ready", data: result.value, error: null };
   return {
@@ -1432,4 +1652,30 @@ function buildRouteUrl(path: string, sourceQuery: SourceQueryConfig, extras: { r
   else params.delete("memoryId");
   const query = params.toString();
   return query ? `${path}?${query}` : path;
+}
+
+function readStoredVisualizerApiKey(): string | undefined {
+  try {
+    const value = window.sessionStorage.getItem(VISUALIZER_API_KEY_STORAGE_KEY)?.trim();
+    return value ? value : undefined;
+  } catch (error) {
+    void error;
+    return undefined;
+  }
+}
+
+function storeVisualizerApiKey(value: string): void {
+  try {
+    window.sessionStorage.setItem(VISUALIZER_API_KEY_STORAGE_KEY, value);
+  } catch (error) {
+    void error;
+  }
+}
+
+function clearStoredVisualizerApiKey(): void {
+  try {
+    window.sessionStorage.removeItem(VISUALIZER_API_KEY_STORAGE_KEY);
+  } catch (error) {
+    void error;
+  }
 }
