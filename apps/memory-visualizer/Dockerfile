@@ -1,11 +1,16 @@
 FROM node:22.16-bookworm-slim AS builder
 
-WORKDIR /app
+WORKDIR /repo
 
-COPY package.json package-lock.json ./
+COPY apps/memory-visualizer/package.json apps/memory-visualizer/package-lock.json ./apps/memory-visualizer/
+WORKDIR /repo/apps/memory-visualizer
 RUN npm ci
 
-COPY . ./
+WORKDIR /repo
+COPY apps/memory-visualizer/index.html apps/memory-visualizer/tsconfig.json apps/memory-visualizer/vite.config.ts apps/memory-visualizer/vite.server.config.ts ./apps/memory-visualizer/
+COPY apps/memory-visualizer/src ./apps/memory-visualizer/src
+COPY src/telemetry ./src/telemetry
+WORKDIR /repo/apps/memory-visualizer
 RUN npm run build
 
 FROM node:22.16-bookworm-slim AS runtime
@@ -19,9 +24,9 @@ ENV TDAI_TELEMETRY_DIR=/data/request-telemetry
 
 WORKDIR /app
 
-COPY package.json ./
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/dist-server ./dist-server
+COPY apps/memory-visualizer/package.json ./
+COPY --from=builder /repo/apps/memory-visualizer/dist ./dist
+COPY --from=builder /repo/apps/memory-visualizer/dist-server ./dist-server
 
 EXPOSE 8421
 

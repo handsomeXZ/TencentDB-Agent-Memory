@@ -30,8 +30,8 @@ services:
 
   tdai-visualizer:
     build:
-      context: ../../apps/memory-visualizer
-      dockerfile: Dockerfile
+      context: ../..
+      dockerfile: apps/memory-visualizer/Dockerfile
     image: tdai-memory-visualizer:local
     container_name: tdai-memory-visualizer
     restart: unless-stopped

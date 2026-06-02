@@ -77,7 +77,7 @@ jobs:
       - name: Build and push Visualizer
         uses: docker/build-push-action@v6
         with:
-          context: ./apps/memory-visualizer
+          context: .
           file: ./apps/memory-visualizer/Dockerfile
           platforms: linux/amd64
           push: true
