@@ -10,11 +10,14 @@ const composePath = path.join(repoRoot, "docker", "standalone", "docker-compose.
 const ghcrComposePath = path.join(repoRoot, "docker", "standalone", "docker-compose.ghcr.yml");
 const gatewayDockerfilePath = path.join(repoRoot, "docker", "standalone", "Dockerfile");
 const dockerfilePath = path.join(appRoot, "Dockerfile");
+const workflowPath = path.join(repoRoot, ".github", "workflows", "publish-ghcr.yml");
+const appReadmePath = path.join(appRoot, "README.md");
+const standaloneReadmePath = path.join(repoRoot, "docker", "standalone", "README.md");
 
 const requiredComposeSnippets = [
   "tdai-visualizer:",
-  "context: ../../apps/memory-visualizer",
-  "dockerfile: Dockerfile",
+  "context: ../..",
+  "dockerfile: apps/memory-visualizer/Dockerfile",
   "image: tdai-memory-gateway:local",
   "image: tdai-memory-visualizer:local",
   "TDAI_VIS_DATA_DIR: /data/memory-tdai",
@@ -56,8 +59,12 @@ const requiredDockerfileSnippets = [
   "ENV TDAI_VIS_OFFLOAD_ROOT=/data/memory-tdai/offload",
   "ENV TDAI_TELEMETRY_DIR=/data/request-telemetry",
   "ENV TDAI_VIS_HOST=0.0.0.0",
-  "COPY --from=builder /app/dist ./dist",
-  "COPY --from=builder /app/dist-server ./dist-server",
+  "COPY apps/memory-visualizer/package.json apps/memory-visualizer/package-lock.json ./apps/memory-visualizer/",
+  "COPY apps/memory-visualizer/index.html apps/memory-visualizer/tsconfig.json apps/memory-visualizer/vite.config.ts apps/memory-visualizer/vite.server.config.ts ./apps/memory-visualizer/",
+  "COPY apps/memory-visualizer/src ./apps/memory-visualizer/src",
+  "COPY src/telemetry ./src/telemetry",
+  "COPY --from=builder /repo/apps/memory-visualizer/dist ./dist",
+  "COPY --from=builder /repo/apps/memory-visualizer/dist-server ./dist-server",
   "EXPOSE 8421",
   "CMD [\"node\", \"dist-server/production.js\"]",
 ];
@@ -69,16 +76,31 @@ const requiredGatewayDockerfileSnippets = [
   "exec node --import tsx/esm src/gateway/server.ts",
 ];
 
+const requiredWorkflowSnippets = [
+  "Build and push Visualizer",
+  "context: .",
+  "file: ./apps/memory-visualizer/Dockerfile",
+];
+
+const requiredDocsSnippets = [
+  "docker build -f apps/memory-visualizer/Dockerfile -t tdai-memory-visualizer:local .",
+  "Run the visualizer Docker build command from the repository root.",
+  "Run the visualizer image build from the repository root.",
+];
+
 function requireSnippet(label, text, snippet, failures) {
   if (!text.includes(snippet)) failures.push(`${label} missing: ${snippet}`);
 }
 
 async function main() {
-  const [composeText, ghcrComposeText, gatewayDockerfileText, dockerfileText] = await Promise.all([
+  const [composeText, ghcrComposeText, gatewayDockerfileText, dockerfileText, workflowText, appReadmeText, standaloneReadmeText] = await Promise.all([
     readFile(composePath, "utf8"),
     readFile(ghcrComposePath, "utf8"),
     readFile(gatewayDockerfilePath, "utf8"),
     readFile(dockerfilePath, "utf8"),
+    readFile(workflowPath, "utf8"),
+    readFile(appReadmePath, "utf8"),
+    readFile(standaloneReadmePath, "utf8"),
   ]);
 
   const failures = [];
@@ -86,6 +108,8 @@ async function main() {
   for (const snippet of requiredGhcrComposeSnippets) requireSnippet("GHCR compose sidecar", ghcrComposeText, snippet, failures);
   for (const snippet of requiredGatewayDockerfileSnippets) requireSnippet("gateway Dockerfile", gatewayDockerfileText, snippet, failures);
   for (const snippet of requiredDockerfileSnippets) requireSnippet("visualizer Dockerfile", dockerfileText, snippet, failures);
+  for (const snippet of requiredWorkflowSnippets) requireSnippet("GHCR workflow", workflowText, snippet, failures);
+  for (const snippet of requiredDocsSnippets) requireSnippet("Docker docs", `${appReadmeText}\n${standaloneReadmeText}`, snippet, failures);
   validateCompose("compose", composeText, failures);
   validateCompose("GHCR compose", ghcrComposeText, failures);
 
@@ -97,6 +121,14 @@ async function main() {
     failures.push("visualizer Dockerfile must not enable Gateway debug proxy by default");
   }
 
+  if (workflowText.includes("context: ./apps/memory-visualizer")) {
+    failures.push("GHCR workflow visualizer build must use the repository root context");
+  }
+
+  if (`${appReadmeText}\n${standaloneReadmeText}`.includes("docker build -f apps/memory-visualizer/Dockerfile -t tdai-memory-visualizer:local apps/memory-visualizer")) {
+    failures.push("Docker docs must not document app-local visualizer build context");
+  }
+
   if (/ports:\s*\n\s*-\s*"8421:8421"/m.test(composeText)) {
     failures.push("compose sidecar must keep visualizer port localhost-bound, not 0.0.0.0-bound");
   }
@@ -105,6 +137,10 @@ async function main() {
   }
   if (/vite\s+(?:--host|dev)/i.test(dockerfileText)) {
     failures.push("visualizer Dockerfile must not run Vite dev server in production");
+  }
+
+  if (dockerfileText.includes("COPY apps/memory-visualizer ./apps/memory-visualizer")) {
+    failures.push("visualizer Dockerfile must not bulk-copy the app directory from the root context");
   }
 
   if (failures.length > 0) {
