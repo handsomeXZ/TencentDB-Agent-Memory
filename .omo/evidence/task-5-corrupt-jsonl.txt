@@ -1,0 +1,16 @@
+Command: npm test -- src/telemetry
+
+Observed result:
+> @handsomecheese/memory-tencentdb@0.3.7 test
+> vitest run src/telemetry
+
+RUN  v4.1.7 D:/ForkWorkSpace/TencentDB-Agent-Memory
+
+Test Files  2 passed (2)
+Tests  17 passed (17)
+
+Relevant covered test:
+src/telemetry/request-telemetry-store.test.ts
+- "skips corrupt JSONL lines and reports the corrupt line count"
+- Fixture lines: valid gateway JSONL, malformed JSON, invalid object shape, valid gateway JSONL
+- Expected: two valid records returned newest-first and telemetry-line-corrupt warning with detail.corruptLines = 2
