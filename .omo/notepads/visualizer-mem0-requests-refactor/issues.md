@@ -29,3 +29,7 @@ No implementation issues recorded yet.
 - F2 rejected the final wave because `TDAI_VIS_DATA_SOURCE=gateway` still served `/api/requests` and `/api/requests/summary` from the Visualizer's local telemetry directory instead of the Gateway DTO APIs.
 - The fix added remote provider methods for Gateway `/visualizer/requests` and `/visualizer/requests/summary`, then branched Visualizer request telemetry reads to those methods only for the remote data source so local merged JSONL behavior stays unchanged.
 - Regression coverage now asserts remote pagination forwarding, Gateway Bearer auth attachment, and Visualizer response-layer warning redaction to `detail: null` for both request telemetry page and summary responses.
+
+## 2026-06-02 Task: GHCR visualizer Docker root context
+- Confirmed the GHCR Visualizer build failure root cause: the workflow and local compose used `apps/memory-visualizer` as the Docker context, but the Visualizer server now imports shared root telemetry modules from `src/telemetry/*`.
+- The fix keeps the runtime image small by using the repository root context only in the builder stage and copying only built `dist`, `dist-server`, and app package metadata into runtime; `dist-server/production.js` bundles the telemetry modules.

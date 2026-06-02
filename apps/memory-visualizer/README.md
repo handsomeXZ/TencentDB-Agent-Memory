@@ -32,10 +32,12 @@ npm --prefix apps/memory-visualizer run check:docker
 Production sidecar commands:
 
 ```bash
-docker build -f apps/memory-visualizer/Dockerfile -t tdai-memory-visualizer:local apps/memory-visualizer
+docker build -f apps/memory-visualizer/Dockerfile -t tdai-memory-visualizer:local .
 docker compose -f docker/standalone/docker-compose.yml config
 docker compose -f docker/standalone/docker-compose.ghcr.yml config
 ```
+
+Run the visualizer Docker build command from the repository root. The Dockerfile intentionally uses the repository root as its build context so the server bundle can import shared telemetry source files from `src/telemetry/*` while keeping the runtime image limited to the built app artifacts.
 
 The production `start` command serves the built Vite assets and the read-only `/api/*` DTO endpoints from one Node process. It does not run the Vite development server. Direct `npm --prefix apps/memory-visualizer run start` listens on `127.0.0.1:8421` by default; the Dockerfile and compose service explicitly set `TDAI_VIS_HOST=0.0.0.0` only for container-internal listening. In the standalone Docker compose files, the `tdai-visualizer` sidecar mounts `tdai_memory_data` at `/data/memory-tdai:ro`, uses `TDAI_VIS_OFFLOAD_ROOT=/data/memory-tdai/offload`, mounts a separate writable `tdai_request_telemetry` volume at `/data/request-telemetry`, sets `TDAI_TELEMETRY_DIR=/data/request-telemetry`, and binds `127.0.0.1:8421:8421` by default.
 

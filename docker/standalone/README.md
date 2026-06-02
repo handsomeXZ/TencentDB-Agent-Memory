@@ -91,9 +91,11 @@ docker push ghcr.io/your_github_username/tencentdb-agent-memory:latest
 docker build \
   -f apps/memory-visualizer/Dockerfile \
   -t ghcr.io/your_github_username/tencentdb-agent-memory-visualizer:latest \
-  apps/memory-visualizer
+  .
 docker push ghcr.io/your_github_username/tencentdb-agent-memory-visualizer:latest
 ```
+
+Run the visualizer image build from the repository root. Its Dockerfile uses the root build context because the Visualizer server imports shared telemetry modules from `src/telemetry/*` outside `apps/memory-visualizer`.
 
 `GHCR_TOKEN` needs `write:packages` permission. If a deployment platform cannot pull the image, make the GitHub Package public or configure GHCR pull credentials there.
 
