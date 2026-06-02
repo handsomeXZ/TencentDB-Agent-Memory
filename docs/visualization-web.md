@@ -6,7 +6,7 @@ Memory Visualizer is a local-only, read-only, app-local web surface for inspecti
 
 The visualizer is meant for white-box inspection. You point it at existing memory data, read capability states and parser warnings, and drill from overview data into scene blocks, L1 memory records, L0 conversation evidence, and offload canvases. When an official visualization tool arrives, this app can be removed without changing server, plugin, or memory storage contracts.
 
-For Docker-based server use, the supported shape is a read-only sidecar next to the Gateway container. The Gateway continues to own writes; the visualizer mounts the same memory volume read-only and serves a browser dashboard on a separate localhost-bound port.
+For Docker-based server use, the supported shape is a read-only sidecar next to the Gateway container. The Gateway continues to own memory writes; the visualizer mounts the same memory volume read-only, mounts a separate writable telemetry volume, and serves a browser dashboard on a separate localhost-bound port.
 
 ## Run Locally
 
@@ -38,7 +38,9 @@ The standalone Docker deployment starts two services from `docker/standalone/doc
 - `tdai-gateway`: the write-capable memory Gateway, bound to `127.0.0.1:8420:8420` by default.
 - `tdai-visualizer`: the read-only dashboard sidecar, bound to `127.0.0.1:8421:8421` by default.
 
-Both services use the same Docker named volume, `tdai_memory_data`. The Gateway mounts it read-write at `/data/memory-tdai`; the visualizer mounts it read-only at `/data/memory-tdai:ro`, reads it through `TDAI_VIS_DATA_DIR=/data/memory-tdai`, and expects offload data at `TDAI_VIS_OFFLOAD_ROOT=/data/memory-tdai/offload`.
+Both services use the same Docker named memory volume, `tdai_memory_data`. The Gateway mounts it read-write at `/data/memory-tdai`; the visualizer mounts it read-only at `/data/memory-tdai:ro`, reads it through `TDAI_VIS_DATA_DIR=/data/memory-tdai`, and expects offload data at `TDAI_VIS_OFFLOAD_ROOT=/data/memory-tdai/offload`.
+
+Standalone compose also mounts a second named volume, `tdai_request_telemetry`, at `/data/request-telemetry`. The shared default is `TDAI_TELEMETRY_DIR=/data/request-telemetry`. The compose invariant is `tdai_memory_data:/data/memory-tdai:ro` for visualizer memory plus a separate writable telemetry mount. That path must stay separate from `/data/memory-tdai`: telemetry is operational append-only data, not memory/session/vector/domain data, and the visualizer memory mount must remain read-only.
 
 Typical commands:
 
@@ -77,8 +79,13 @@ The primary visualizer environment variable names are:
 - `TDAI_VIS_GATEWAY_URL`
 - `TDAI_VIS_GATEWAY_API_KEY`
 - `TDAI_VIS_API_KEY`
+- `TDAI_TELEMETRY_DIR`
+- `TDAI_GATEWAY_TELEMETRY_DIR`
+- `TDAI_VIS_TELEMETRY_DIR`
 
 Use `TDAI_VIS_DATA_DIR` for the memory root and `TDAI_VIS_OFFLOAD_ROOT` for offload files when they live outside the default root layout. `TDAI_VIS_GATEWAY_URL` names a Gateway endpoint, but its role depends on `TDAI_VIS_DATA_SOURCE`: with the default local source it only enables explicit opt-in Search/Recall Debug connectivity; with `TDAI_VIS_DATA_SOURCE=gateway` it becomes the primary read-only dashboard DTO source. Use `TDAI_VIS_GATEWAY_API_KEY` when the Gateway requires a bearer token. `TDAI_VIS_API_KEY` is the visualizer's own optional shared Bearer-token gate. Leave it unset for local-only defaults, or set it when you want every read-only `/api/*` route except `GET /health` to require `Authorization: Bearer <key>`, while static SPA assets stay public for the login screen. The Docker sidecar leaves `TDAI_VIS_GATEWAY_URL` unset by default so Search/Recall Debug degrades to disabled instead of proxying recall or search through a reverse proxy accidentally.
+
+Telemetry directory precedence is role-specific. Gateway writer precedence is `TDAI_GATEWAY_TELEMETRY_DIR -> TDAI_TELEMETRY_DIR -> disabled`. Visualizer writer and reader precedence is `TDAI_VIS_TELEMETRY_DIR -> TDAI_TELEMETRY_DIR -> disabled`. In standalone compose, setting only `TDAI_TELEMETRY_DIR=/data/request-telemetry` is enough because both processes fall back to the shared path.
 
 For deployment platforms where the Gateway and Visualizer cannot share a filesystem volume, set `TDAI_VIS_DATA_SOURCE=gateway`, `TDAI_VIS_GATEWAY_URL=<gateway-url>`, and `TDAI_VIS_GATEWAY_API_KEY=<same-secret-as-TDAI_GATEWAY_API_KEY>`. In that mode the Visualizer server does not read `TDAI_VIS_DATA_DIR`; it proxies its read-only dashboard DTO routes to Gateway `/visualizer/*` APIs. Those Gateway visualizer APIs fail closed unless `TDAI_GATEWAY_API_KEY` is configured, and every request must include `Authorization: Bearer <key>`. This remote DTO mode is separate from Search/Recall Debug: the same Gateway URL variable is reused, but `TDAI_VIS_DATA_SOURCE=gateway` is the switch that makes Gateway the dashboard data source.
 
@@ -112,6 +119,12 @@ Each layer reports a capability status of `available`, `missing`, `partial`, `er
 ### Gateway debug note
 
 Gateway Search/Recall Debug is optional and debug-only in this app. `GET /health`, recall checks, and `/search/*` responses are for diagnostics. Gateway `/search/*` output is raw formatted debug text, not structured primary data, and the visualizer should not treat it as the canonical source of records or conversations. The standalone Docker sidecar disables this proxy path by default; to opt in while still using the default local filesystem data source, leave `TDAI_VIS_DATA_SOURCE` unset or local, set `TDAI_VIS_GATEWAY_URL=http://tdai-gateway:8420`, and, when auth is enabled, `TDAI_VIS_GATEWAY_API_KEY` in a trusted deployment. The server still exposes only the fixed read/query debug endpoints and no Gateway `/capture`, `/seed`, or `/session/end` passthrough.
+
+### Requests Monitor telemetry note
+
+Requests Monitor is observability-only. It reads append-only JSONL telemetry and shows trends, warnings, and recent request metadata, but it does not control capture, seed, session-end, reindex, or any memory mutation path.
+
+Telemetry storage is intentionally privacy-constrained. Stored records keep pathname and allowlisted query key names only. In short, telemetry stores no raw URL/query/body/response/headers/secrets/content. It also does not keep prompts, tokens, or recalled content. The default skip policy also skips health, static, and request monitor routes by default. To mirror the runtime contract in one sentence, skip health, static, and request monitor routes by default so the monitor does not flood itself with self-generated noise.
 
 ### Visualizer access auth note
 
@@ -198,6 +211,6 @@ npm --prefix apps/memory-visualizer run safety:readonly
 npm --prefix apps/memory-visualizer run check:docker
 ```
 
-The docs checker validates headings, exact commands, boundary exclusions, env vars, and replacement wording. Typecheck confirms the app-local code still compiles. Tests and build cover the server, provider, UI, and production bundle. The readonly safety script confirms production app code stays away from write APIs and forbidden Gateway write endpoints.
+The docs checker validates headings, exact commands, boundary exclusions, env vars, telemetry precedence, privacy wording, and replacement wording. Typecheck confirms the app-local code still compiles. Tests and build cover the server, provider, UI, and production bundle. The readonly safety script confirms production app code stays away from write APIs and forbidden Gateway write endpoints, and also confirms the standalone compose files keep the visualizer memory mount read-only while telemetry stays on a separate writable path.
 
-The Docker sidecar checker confirms that the standalone Gateway publish remains `127.0.0.1:8420:8420`, the visualizer remains localhost-bound, mounts the shared memory volume read-only, keeps `TDAI_VIS_OFFLOAD_ROOT=/data/memory-tdai/offload`, leaves Gateway debug proxying disabled by default, and does not run the Vite development server in the runtime image.
+The Docker sidecar checker confirms that the standalone Gateway publish remains `127.0.0.1:8420:8420`, the visualizer remains localhost-bound, mounts `tdai_memory_data` read-only at `/data/memory-tdai:ro`, mounts `tdai_request_telemetry` separately at `/data/request-telemetry`, keeps `TDAI_TELEMETRY_DIR=/data/request-telemetry`, keeps `TDAI_VIS_OFFLOAD_ROOT=/data/memory-tdai/offload`, leaves Gateway debug proxying disabled by default, and does not run the Vite development server in the runtime image.

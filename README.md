@@ -272,9 +272,9 @@ If you want a standalone local service, the compose setup in [`docker/standalone
 - Gateway on `http://127.0.0.1:8420`
 - Memory Visualizer on `http://127.0.0.1:8421`
 
-The visualizer mounts the same memory data read-only, serves a local dashboard plus read-only `/api/*` endpoints, and is meant for white-box inspection rather than operating the memory system. See [`apps/memory-visualizer/README.md`](./apps/memory-visualizer/README.md) for its local-only, read-only boundary and data source details.
+The visualizer mounts the same memory data read-only, serves a local dashboard plus read-only `/api/*` endpoints, and is meant for white-box inspection rather than operating the memory system. Standalone compose keeps `tdai_memory_data:/data/memory-tdai:ro` on the visualizer and mounts a separate writable `tdai_request_telemetry:/data/request-telemetry` volume with `TDAI_TELEMETRY_DIR=/data/request-telemetry` for request telemetry. See [`apps/memory-visualizer/README.md`](./apps/memory-visualizer/README.md) for its local-only, read-only boundary, telemetry privacy rules, and data source details.
 
-For GHCR-based deployment, `ghcr.io/<owner>/tencentdb-agent-memory` is Gateway-only and `ghcr.io/<owner>/tencentdb-agent-memory-visualizer` is the separate read-only sidecar image. The visualizer startup log `Memory Visualizer listening on http://0.0.0.0:8421` should appear in the visualizer container logs, not the Gateway container logs.
+For GHCR-based deployment, `ghcr.io/<owner>/tencentdb-agent-memory` is Gateway-only and `ghcr.io/<owner>/tencentdb-agent-memory-visualizer` is the separate read-only sidecar image. The visualizer startup log `Memory Visualizer listening on http://0.0.0.0:8421` should appear in the visualizer container logs, not the Gateway container logs. Telemetry env precedence is `TDAI_GATEWAY_TELEMETRY_DIR -> TDAI_TELEMETRY_DIR -> disabled` for the Gateway and `TDAI_VIS_TELEMETRY_DIR -> TDAI_TELEMETRY_DIR -> disabled` for the visualizer. Requests Monitor is observability-only, skips health/static/request monitor routes by default, and stores pathname plus allowlisted query key names only, never raw URL/query/body/response/headers/secrets/content.
 
 ## 🔒 Gateway Security (optional)
 

@@ -19,11 +19,13 @@ const requiredComposeSnippets = [
   "image: tdai-memory-visualizer:local",
   "TDAI_VIS_DATA_DIR: /data/memory-tdai",
   "TDAI_VIS_OFFLOAD_ROOT: /data/memory-tdai/offload",
+  "TDAI_TELEMETRY_DIR: /data/request-telemetry",
   "env_file:",
   "- .env.local",
   "127.0.0.1:8421:8421",
   "127.0.0.1:8420:8420",
   "tdai_memory_data:/data/memory-tdai:ro",
+  "tdai_request_telemetry:/data/request-telemetry",
   "condition: service_healthy",
 ];
 
@@ -34,11 +36,13 @@ const requiredGhcrComposeSnippets = [
   "ghcr.io/${TDAI_GHCR_OWNER:-handsomexz}/tencentdb-agent-memory-visualizer:${TDAI_GHCR_TAG:-latest}",
   "TDAI_VIS_DATA_DIR: /data/memory-tdai",
   "TDAI_VIS_OFFLOAD_ROOT: /data/memory-tdai/offload",
+  "TDAI_TELEMETRY_DIR: /data/request-telemetry",
   "env_file:",
   "- .env.local",
   "127.0.0.1:8421:8421",
   "127.0.0.1:8420:8420",
   "tdai_memory_data:/data/memory-tdai:ro",
+  "tdai_request_telemetry:/data/request-telemetry",
   "condition: service_healthy",
 ];
 
@@ -50,6 +54,7 @@ const requiredDockerfileSnippets = [
   "ENV TDAI_VIS_PORT=8421",
   "ENV TDAI_VIS_DATA_DIR=/data/memory-tdai",
   "ENV TDAI_VIS_OFFLOAD_ROOT=/data/memory-tdai/offload",
+  "ENV TDAI_TELEMETRY_DIR=/data/request-telemetry",
   "ENV TDAI_VIS_HOST=0.0.0.0",
   "COPY --from=builder /app/dist ./dist",
   "COPY --from=builder /app/dist-server ./dist-server",
@@ -145,6 +150,20 @@ function validateCompose(label, composeText, failures) {
     if (/tdai_memory_data:\/data\/memory-tdai(?!:ro)/.test(visualizerBlock)) {
       failures.push(`${label} visualizer must mount tdai_memory_data read-only`);
     }
+    if (!/tdai_request_telemetry:\/data\/request-telemetry(?!:ro)/.test(visualizerBlock)) {
+      failures.push(`${label} visualizer must mount tdai_request_telemetry writable at /data/request-telemetry`);
+    }
+    if (/tdai_request_telemetry:\/data\/memory-tdai(?::ro)?/.test(visualizerBlock) || /TDAI_(?:VIS_|GATEWAY_)?TELEMETRY_DIR:\s*\/data\/memory-tdai(?:\/|\b)/.test(visualizerBlock)) {
+      failures.push(`${label} visualizer telemetry must not reuse the memory mount or live under /data/memory-tdai`);
+    }
+  }
+
+  if (/TDAI_(?:VIS_|GATEWAY_)?TELEMETRY_DIR:\s*\/data\/memory-tdai(?:\/|\b)/.test(gatewayBlock ?? "")) {
+    failures.push(`${label} Gateway telemetry must not reuse /data/memory-tdai`);
+  }
+
+  if (!composeText.includes("tdai_request_telemetry:")) {
+    failures.push(`${label} missing tdai_request_telemetry named volume declaration`);
   }
 
   if (visualizerBlock?.includes("TDAI_VIS_GATEWAY_URL") || visualizerBlock?.includes("TDAI_VIS_GATEWAY_API_KEY")) {

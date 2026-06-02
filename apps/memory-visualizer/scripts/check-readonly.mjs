@@ -5,6 +5,11 @@ import { extname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const appRoot = fileURLToPath(new URL("..", import.meta.url));
+const repoRoot = fileURLToPath(new URL("../../..", import.meta.url));
+const composePaths = [
+  join(repoRoot, "docker", "standalone", "docker-compose.yml"),
+  join(repoRoot, "docker", "standalone", "docker-compose.ghcr.yml"),
+];
 const scanRoots = ["src"];
 const productionExtensions = new Set([".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"]);
 const ignoredFilePatterns = [/\.test\.[cm]?[jt]sx?$/, /\.spec\.[cm]?[jt]sx?$/];
@@ -111,6 +116,7 @@ async function main() {
   }
 
   const violations = (await Promise.all(files.map(scanFile))).flat();
+  violations.push(...(await validateComposeTelemetrySafety()));
 
   console.log(`Readonly safety scan directories: ${scannedDirectories.join(", ")}`);
   console.log(`Readonly safety scan files: ${files.length}`);
@@ -126,6 +132,67 @@ async function main() {
   }
 
   console.log("Readonly safety scan passed.");
+}
+
+async function validateComposeTelemetrySafety() {
+  const violations = [];
+
+  for (const composePath of composePaths) {
+    const content = await readFile(composePath, "utf8");
+    const displayPath = relative(repoRoot, composePath).replaceAll("\\", "/");
+    const visualizerBlock = readServiceBlock(content, "tdai-visualizer");
+
+    if (visualizerBlock === null) {
+      violations.push({
+        filePath: composePath,
+        line: 1,
+        reason: "missing tdai-visualizer service for readonly safety checks",
+      });
+      continue;
+    }
+
+    const memoryMount = "tdai_memory_data:/data/memory-tdai:ro";
+    if (!visualizerBlock.includes(memoryMount)) {
+      violations.push({
+        filePath: composePath,
+        line: 1,
+        reason: `${displayPath} must keep visualizer memory mount read-only as ${memoryMount}`,
+      });
+    }
+
+    const telemetryMount = "tdai_request_telemetry:/data/request-telemetry";
+    if (!visualizerBlock.includes(telemetryMount)) {
+      violations.push({
+        filePath: composePath,
+        line: 1,
+        reason: `${displayPath} must mount writable telemetry volume as ${telemetryMount}`,
+      });
+    }
+
+    if (/TDAI_(?:VIS_|GATEWAY_)?TELEMETRY_DIR:\s*\/data\/memory-tdai(?:\/|\b)/.test(visualizerBlock)) {
+      violations.push({
+        filePath: composePath,
+        line: 1,
+        reason: `${displayPath} must not place telemetry under /data/memory-tdai`,
+      });
+    }
+  }
+
+  return violations;
+}
+
+function readServiceBlock(composeText, serviceName) {
+  const lines = composeText.split(/\r?\n/);
+  const start = lines.findIndex((line) => line === `  ${serviceName}:`);
+  if (start === -1) return null;
+  const block = [];
+
+  for (const line of lines.slice(start + 1)) {
+    if (/^  [A-Za-z0-9_-]+:\s*$/.test(line) || /^volumes:\s*$/.test(line)) break;
+    block.push(line);
+  }
+
+  return block.join("\n");
 }
 
 main().catch((error) => {

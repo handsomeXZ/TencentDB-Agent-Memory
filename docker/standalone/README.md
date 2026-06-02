@@ -7,7 +7,7 @@ The standalone config uses OpenRouter embeddings with `qwen/qwen3-embedding-8b` 
 ## Files
 
 - `Dockerfile`: Node 22.16 Gateway-only image that clones `TDAI_RELEASE_TAG` from `TDAI_REPO`, optionally verifies `TDAI_RELEASE_COMMIT`, and starts the Gateway.
-- `docker-compose.yml`: local build-from-source Gateway service, read-only visualizer sidecar, shared data volume, config mount, port mappings, and healthchecks.
+- `docker-compose.yml`: local build-from-source Gateway service, read-only visualizer sidecar, shared memory volume, separate telemetry volume, config mount, port mappings, and healthchecks.
 - `docker-compose.ghcr.yml`: GHCR-based Gateway plus read-only visualizer sidecar using published images instead of local build contexts.
 - `tdai-gateway.standalone.yaml`: Gateway, data, LLM, and OpenRouter embedding config.
 - `.env.example`: Secret-safe template. Copy it to `.env.local` before running.
@@ -104,9 +104,11 @@ cd docker/standalone
 docker compose up -d
 ```
 
-The default compose publish is `127.0.0.1:8420:8420`, so the Gateway listens on `http://127.0.0.1:8420` by default and stores data in the named Docker volume `tdai_memory_data`, mounted read-write at `/data/memory-tdai` inside the Gateway container.
+The default compose publish is `127.0.0.1:8420:8420`, so the Gateway listens on `http://127.0.0.1:8420` by default and stores memory data in the named Docker volume `tdai_memory_data`, mounted read-write at `/data/memory-tdai` inside the Gateway container.
 
-The compose file also starts `tdai-visualizer` on `http://127.0.0.1:8421`. It mounts the same `tdai_memory_data` volume read-only at `/data/memory-tdai:ro`, sets `TDAI_VIS_DATA_DIR=/data/memory-tdai` and `TDAI_VIS_OFFLOAD_ROOT=/data/memory-tdai/offload`, and serves the dashboard plus read-only `/api/*` endpoints from one Node process. It does not run the Vite development server. Set `TDAI_VIS_API_KEY` in `.env.local`; production visualizer APIs fail closed without it.
+The compose file also starts `tdai-visualizer` on `http://127.0.0.1:8421`. It mounts the same `tdai_memory_data` volume read-only at `/data/memory-tdai:ro`, sets `TDAI_VIS_DATA_DIR=/data/memory-tdai` and `TDAI_VIS_OFFLOAD_ROOT=/data/memory-tdai/offload`, mounts a separate writable `tdai_request_telemetry` volume at `/data/request-telemetry`, sets `TDAI_TELEMETRY_DIR=/data/request-telemetry`, and serves the dashboard plus read-only `/api/*` endpoints from one Node process. It does not run the Vite development server. Set `TDAI_VIS_API_KEY` in `.env.local`; production visualizer APIs fail closed without it.
+
+Telemetry path precedence is role-specific. Gateway writer precedence is `TDAI_GATEWAY_TELEMETRY_DIR`, then `TDAI_TELEMETRY_DIR`, then disabled. Visualizer writer and reader precedence is `TDAI_VIS_TELEMETRY_DIR`, then `TDAI_TELEMETRY_DIR`, then disabled. Standalone compose uses the shared default `TDAI_TELEMETRY_DIR=/data/request-telemetry`, so both processes read and write telemetry without ever making `/data/memory-tdai` writable inside the visualizer.
 
 To run from published GHCR images instead of local build contexts:
 
@@ -124,6 +126,10 @@ TDAI_GHCR_OWNER=your_github_username TDAI_GHCR_TAG=sha-<commit> docker compose -
 ```
 
 Gateway Search/Recall Debug proxying is disabled by default in the sidecar because recall and search can reveal memory contents. To opt in while still using the default local filesystem data source, leave `TDAI_VIS_DATA_SOURCE` unset or local, add `TDAI_VIS_GATEWAY_URL=http://tdai-gateway:8420` to the `tdai-visualizer` environment, and add `TDAI_VIS_GATEWAY_API_KEY=${TDAI_GATEWAY_API_KEY:-}` only when the Gateway requires the bearer token. The visualizer still allows only fixed read/query debug endpoints and no `/capture`, `/seed`, or `/session/end` passthrough.
+
+Requests Monitor is observability-only. It reads append-only telemetry JSONL files and does not add capture, seed, session-end, reindex, or any other control surface.
+
+Telemetry privacy is intentionally narrow: the monitor stores pathname and allowlisted query key names only. It does not store raw URL values, raw query values, request bodies, response bodies, headers, prompts, tokens, secrets, or memory content. Health, static asset, and Requests Monitor routes are skipped by default so the telemetry files stay focused on real operational traffic.
 
 If you need to expose the Gateway beyond localhost, first set a strong non-empty `TDAI_GATEWAY_API_KEY`, then add network controls such as a firewall rule, reverse proxy allow-list, private subnet, or VPN before changing the published host binding.
 
@@ -229,6 +235,7 @@ TDAI_DATA_DIR=/data/memory-tdai
 TDAI_GATEWAY_HOST=0.0.0.0
 TDAI_GATEWAY_PORT=8420
 TDAI_DEPLOY_MODE=standalone
+TDAI_TELEMETRY_DIR=/data/request-telemetry
 ```
 
 The visualizer sidecar sets these runtime values:
@@ -238,6 +245,7 @@ TDAI_VIS_DATA_DIR=/data/memory-tdai
 TDAI_VIS_OFFLOAD_ROOT=/data/memory-tdai/offload
 TDAI_VIS_HOST=0.0.0.0
 TDAI_VIS_PORT=8421
+TDAI_TELEMETRY_DIR=/data/request-telemetry
 ```
 
 `TDAI_VIS_GATEWAY_URL` is intentionally absent from those defaults. Set it explicitly only when enabling Search/Recall Debug in a trusted local-source environment, or when `TDAI_VIS_DATA_SOURCE=gateway` makes Gateway `/visualizer/*` the primary dashboard DTO source.

@@ -15,6 +15,7 @@ ENV TDAI_VIS_HOST=0.0.0.0
 ENV TDAI_VIS_PORT=8421
 ENV TDAI_VIS_DATA_DIR=/data/memory-tdai
 ENV TDAI_VIS_OFFLOAD_ROOT=/data/memory-tdai/offload
+ENV TDAI_TELEMETRY_DIR=/data/request-telemetry
 
 WORKDIR /app
 

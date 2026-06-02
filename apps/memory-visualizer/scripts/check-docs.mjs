@@ -9,6 +9,7 @@ const repoRoot = path.resolve(appRoot, "..", "..");
 
 const docsPath = path.join(repoRoot, "docs", "visualization-web.md");
 const readmePath = path.join(appRoot, "README.md");
+const rootReadmePath = path.join(repoRoot, "README.md");
 
 const requiredHeadings = [
   "## Overview",
@@ -40,6 +41,9 @@ const requiredEnvVars = [
   "TDAI_VIS_GATEWAY_URL",
   "TDAI_VIS_GATEWAY_API_KEY",
   "TDAI_VIS_API_KEY",
+  "TDAI_TELEMETRY_DIR",
+  "TDAI_GATEWAY_TELEMETRY_DIR",
+  "TDAI_VIS_TELEMETRY_DIR",
 ];
 
 const requiredViews = [
@@ -81,6 +85,16 @@ const requiredDocPhrases = [
   "direct `npm --prefix apps/memory-visualizer run start` listens on `127.0.0.1:8421` by default",
   "TDAI_VIS_OFFLOAD_ROOT=/data/memory-tdai/offload",
   "leaves `TDAI_VIS_GATEWAY_URL` unset by default",
+  "tdai_request_telemetry",
+  "tdai_memory_data:/data/memory-tdai:ro",
+  "TDAI_TELEMETRY_DIR=/data/request-telemetry",
+  "TDAI_GATEWAY_TELEMETRY_DIR -> TDAI_TELEMETRY_DIR -> disabled",
+  "TDAI_VIS_TELEMETRY_DIR -> TDAI_TELEMETRY_DIR -> disabled",
+  "Requests Monitor",
+  "observability-only",
+  "skip health, static, and request monitor routes by default",
+  "pathname and allowlisted query key names only",
+  "no raw url/query/body/response/headers/secrets/content",
 ];
 
 const forbiddenPositivePatterns = [
@@ -123,12 +137,13 @@ function assertForbiddenPatterns(label, text, patterns, failures) {
 }
 
 async function main() {
-  const [docsText, readmeText] = await Promise.all([
+  const [docsText, readmeText, rootReadmeText] = await Promise.all([
     readFile(docsPath, "utf8"),
     readFile(readmePath, "utf8"),
+    readFile(rootReadmePath, "utf8"),
   ]);
 
-  const combined = `${docsText}\n${readmeText}`;
+  const combined = `${docsText}\n${readmeText}\n${rootReadmeText}`;
   const failures = [];
 
   assertContainsAll("docs headings", docsText, requiredHeadings, failures);
@@ -152,6 +167,14 @@ async function main() {
 
   if (!readmeText.includes("Gateway `/search/*` is debug text, not structured primary data.")) {
     failures.push("README missing Gateway debug text note");
+  }
+
+  if (!rootReadmeText.includes("TDAI_TELEMETRY_DIR=/data/request-telemetry")) {
+    failures.push("root README missing standalone telemetry default path");
+  }
+
+  if (!combined.includes("privacy") || !combined.includes("Requests Monitor")) {
+    failures.push("docs missing telemetry privacy or Requests Monitor wording");
   }
 
   assertForbiddenPatterns("combined docs", combined, forbiddenPositivePatterns, failures);

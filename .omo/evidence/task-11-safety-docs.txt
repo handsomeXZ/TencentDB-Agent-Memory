@@ -1,0 +1,25 @@
+Task 11 docs and privacy verification summary
+Date: 2026-06-02
+
+Commands run from repository root:
+- node apps/memory-visualizer/scripts/check-docs.mjs
+
+Observed results:
+- Documentation checks passed.
+- Validated headings: 8
+- Validated commands: 9
+- Validated boundary phrases: 11
+
+Grepped documentation confirms these points:
+- apps/memory-visualizer/README.md lists TDAI_TELEMETRY_DIR, TDAI_GATEWAY_TELEMETRY_DIR, and TDAI_VIS_TELEMETRY_DIR.
+- docker/standalone/README.md documents standalone default TDAI_TELEMETRY_DIR=/data/request-telemetry.
+- README.md states standalone compose keeps tdai_memory_data:/data/memory-tdai:ro and uses a separate tdai_request_telemetry volume.
+- Visualizer and standalone docs describe precedence as TDAI_GATEWAY_TELEMETRY_DIR -> TDAI_TELEMETRY_DIR -> disabled and TDAI_VIS_TELEMETRY_DIR -> TDAI_TELEMETRY_DIR -> disabled.
+- Requests Monitor is documented as observability-only.
+- Docs state telemetry stores pathname and allowlisted query key names only.
+- Docs state telemetry does not store raw URL values, raw query values, request bodies, response bodies, headers, prompts, tokens, secrets, or memory content.
+- Docs state health, static asset, and Requests Monitor routes are skipped by default.
+
+Secret safety note:
+- Evidence contains only command names, pass/fail results, and documented invariants.
+- No API keys, bearer tokens, file path secrets, request content, or telemetry payload samples were recorded here.

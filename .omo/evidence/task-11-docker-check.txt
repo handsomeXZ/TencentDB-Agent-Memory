@@ -1,0 +1,24 @@
+Task 11 Docker verification summary
+Date: 2026-06-02
+
+Commands run from repository root:
+- npm --prefix apps/memory-visualizer run check:docker
+- npm --prefix apps/memory-visualizer run safety:readonly
+
+Observed results:
+- check:docker passed with message: Docker sidecar checks passed.
+- safety:readonly passed with message: Readonly safety scan passed.
+- safety:readonly scanned 43 production app files under apps/memory-visualizer/src.
+
+Verified container and compose invariants:
+- docker/standalone/docker-compose.yml keeps tdai_memory_data mounted into tdai-visualizer as /data/memory-tdai:ro.
+- docker/standalone/docker-compose.ghcr.yml keeps tdai_memory_data mounted into tdai-visualizer as /data/memory-tdai:ro.
+- Both standalone compose files now mount tdai_request_telemetry at /data/request-telemetry.
+- Both standalone compose files now set TDAI_TELEMETRY_DIR=/data/request-telemetry.
+- apps/memory-visualizer/Dockerfile now sets TDAI_TELEMETRY_DIR=/data/request-telemetry and does not enable Gateway debug proxy by default.
+
+Safety assertions now enforced by scripts:
+- Visualizer memory mount must stay read-only.
+- Telemetry must stay on a separate writable path and named volume.
+- Telemetry must not point at or nest under /data/memory-tdai.
+- Localhost-only port bindings for 8420 and 8421 remain required.

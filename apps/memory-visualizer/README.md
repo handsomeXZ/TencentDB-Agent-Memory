@@ -37,7 +37,7 @@ docker compose -f docker/standalone/docker-compose.yml config
 docker compose -f docker/standalone/docker-compose.ghcr.yml config
 ```
 
-The production `start` command serves the built Vite assets and the read-only `/api/*` DTO endpoints from one Node process. It does not run the Vite development server. Direct `npm --prefix apps/memory-visualizer run start` listens on `127.0.0.1:8421` by default; the Dockerfile and compose service explicitly set `TDAI_VIS_HOST=0.0.0.0` only for container-internal listening. In the standalone Docker compose files, the `tdai-visualizer` sidecar mounts `tdai_memory_data` at `/data/memory-tdai:ro`, uses `TDAI_VIS_OFFLOAD_ROOT=/data/memory-tdai/offload`, and binds `127.0.0.1:8421:8421` by default.
+The production `start` command serves the built Vite assets and the read-only `/api/*` DTO endpoints from one Node process. It does not run the Vite development server. Direct `npm --prefix apps/memory-visualizer run start` listens on `127.0.0.1:8421` by default; the Dockerfile and compose service explicitly set `TDAI_VIS_HOST=0.0.0.0` only for container-internal listening. In the standalone Docker compose files, the `tdai-visualizer` sidecar mounts `tdai_memory_data` at `/data/memory-tdai:ro`, uses `TDAI_VIS_OFFLOAD_ROOT=/data/memory-tdai/offload`, mounts a separate writable `tdai_request_telemetry` volume at `/data/request-telemetry`, sets `TDAI_TELEMETRY_DIR=/data/request-telemetry`, and binds `127.0.0.1:8421:8421` by default.
 
 The GHCR deployment stays split by design: `ghcr.io/<owner>/tencentdb-agent-memory` is Gateway-only, while `ghcr.io/<owner>/tencentdb-agent-memory-visualizer` is the sidecar image. The expected startup log `Memory Visualizer listening on http://0.0.0.0:8421` appears in the visualizer container logs, not in the Gateway container logs.
 
@@ -49,11 +49,23 @@ Primary data source env vars:
 - `TDAI_VIS_GATEWAY_URL`
 - `TDAI_VIS_GATEWAY_API_KEY`
 
+Telemetry env vars:
+
+- `TDAI_TELEMETRY_DIR`
+- `TDAI_GATEWAY_TELEMETRY_DIR`
+- `TDAI_VIS_TELEMETRY_DIR`
+
 Visualizer access auth env var:
 
 - `TDAI_VIS_API_KEY`
 
 Data source priority is request or UI path, then environment variables, then app-local config, then empty state and default examples.
+
+Telemetry path priority is `TDAI_VIS_TELEMETRY_DIR`, then `TDAI_TELEMETRY_DIR`, then disabled. Gateway writer priority is `TDAI_GATEWAY_TELEMETRY_DIR`, then `TDAI_TELEMETRY_DIR`, then disabled. In the standalone sidecar, the shared default is `TDAI_TELEMETRY_DIR=/data/request-telemetry` on a dedicated writable volume, while the memory mount stays read-only.
+
+Requests Monitor is observability-only. It reads append-only telemetry records and never exposes controls for capture, seed, session-end, reindex, or memory mutation.
+
+Telemetry privacy boundary: the monitor keeps pathname and allowlisted query key names only. It does not store raw URL values, raw query values, request bodies, response bodies, headers, prompts, tokens, secrets, or recalled content. Health, static asset, and Requests Monitor routes are skipped by default, so self-observation noise stays out of the JSONL files.
 
 For Zeabur or any deployment where the Visualizer cannot mount the Gateway data volume, set `TDAI_VIS_DATA_SOURCE=gateway`, `TDAI_VIS_GATEWAY_URL` to the Gateway service URL, and `TDAI_VIS_GATEWAY_API_KEY` to the same value as Gateway `TDAI_GATEWAY_API_KEY`. This makes the Visualizer use Gateway `/visualizer/*` read-only DTO APIs instead of reading the local filesystem.
 

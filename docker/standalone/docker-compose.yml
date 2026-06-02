@@ -11,6 +11,7 @@ services:
     environment:
       TDAI_GATEWAY_CONFIG: /config/tdai-gateway.standalone.yaml
       TDAI_DATA_DIR: /data/memory-tdai
+      TDAI_TELEMETRY_DIR: /data/request-telemetry
       TDAI_GATEWAY_HOST: 0.0.0.0
       TDAI_GATEWAY_PORT: "8420"
       TDAI_DEPLOY_MODE: standalone
@@ -18,6 +19,7 @@ services:
       - "127.0.0.1:8420:8420"
     volumes:
       - tdai_memory_data:/data/memory-tdai
+      - tdai_request_telemetry:/data/request-telemetry
       - ./tdai-gateway.standalone.yaml:/config/tdai-gateway.standalone.yaml:ro
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8420/health"]
@@ -41,10 +43,12 @@ services:
       TDAI_VIS_PORT: "8421"
       TDAI_VIS_DATA_DIR: /data/memory-tdai
       TDAI_VIS_OFFLOAD_ROOT: /data/memory-tdai/offload
+      TDAI_TELEMETRY_DIR: /data/request-telemetry
     ports:
       - "127.0.0.1:8421:8421"
     volumes:
       - tdai_memory_data:/data/memory-tdai:ro
+      - tdai_request_telemetry:/data/request-telemetry
     depends_on:
       tdai-gateway:
         condition: service_healthy
@@ -57,3 +61,4 @@ services:
 
 volumes:
   tdai_memory_data:
+  tdai_request_telemetry:
