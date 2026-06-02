@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 
-import type { CapabilityStatusValue, ConversationEvidence, DashboardSnapshot, OffloadReference, StructuredMemorySummary } from "../contracts/dashboard";
+import { JsonHintCard, MetaPair, PageControls, StateCard, StatusBadge } from "./components";
+
+import type { ConversationEvidence, DashboardSnapshot, OffloadReference, StructuredMemorySummary } from "../contracts/dashboard";
 import type { DashboardPage } from "../providers";
 import type { DashboardApiClient, EvidenceLinkIndexEntry, PageRequest, SourceQueryConfig } from "./api-client";
 
@@ -461,33 +463,6 @@ function MemoryFilterBar(props: {
   );
 }
 
-function PageControls(props: {
-  readonly page: DashboardPage<unknown>;
-  readonly busy: boolean;
-  readonly onChange: (page: PageRequest) => void;
-}) {
-  const { page, busy, onChange } = props;
-  const previousOffset = Math.max(0, page.offset - page.limit);
-  const nextOffset = page.offset + page.limit;
-  const end = Math.min(page.total, page.offset + page.items.length);
-  const start = page.total === 0 ? 0 : page.offset + 1;
-  return (
-    <div className="page-controls">
-      <div className="route-copy">
-        当前显示第 <span className="mono">{start}</span> 到 <span className="mono">{end}</span> 条，共 <span className="mono">{page.total}</span> 条记录。
-      </div>
-      <div className="form-actions">
-        <button className="button" type="button" disabled={busy || page.offset === 0} onClick={() => onChange({ offset: previousOffset, limit: page.limit })}>
-          上一页
-        </button>
-        <button className="button" type="button" disabled={busy || nextOffset >= page.total} onClick={() => onChange({ offset: nextOffset, limit: page.limit })}>
-          下一页
-        </button>
-      </div>
-    </div>
-  );
-}
-
 function SummaryCluster(props: {
   readonly title: string;
   readonly items: readonly { readonly label: string; readonly value: number }[];
@@ -513,38 +488,6 @@ function SummaryCluster(props: {
   );
 }
 
-function StateCard(props: {
-  readonly tone: "loading" | "warning" | "error" | "empty";
-  readonly label: string;
-  readonly title: string;
-  readonly detail: string;
-}) {
-  return (
-    <article className="state-card" data-tone={props.tone}>
-      <div className="meta-label">{props.label}</div>
-      <strong>{props.title}</strong>
-      <div className="state-copy">{props.detail}</div>
-    </article>
-  );
-}
-
-function StatusBadge(props: { readonly status: CapabilityStatusValue; readonly children: string }) {
-  return (
-    <span className="capability-badge" data-status={props.status}>
-      {props.children}
-    </span>
-  );
-}
-
-function MetaPair(props: { readonly label: string; readonly value: string; readonly mono?: boolean }) {
-  return (
-    <div className="stack-row">
-      <span className="meta-label">{props.label}</span>
-      <span className={props.mono ? "mono" : undefined}>{props.value}</span>
-    </div>
-  );
-}
-
 function WarningTagList(props: { readonly warnings: readonly string[] }) {
   return (
     <div className="warning-tag-list">
@@ -554,15 +497,6 @@ function WarningTagList(props: { readonly warnings: readonly string[] }) {
         </span>
       ))}
     </div>
-  );
-}
-
-function JsonHintCard(props: { readonly title: string; readonly value: unknown }) {
-  return (
-    <article className="table-card">
-      <div className="table-label">{props.title}</div>
-      <pre className="json-hint">{JSON.stringify(props.value, null, 2)}</pre>
-    </article>
   );
 }
 

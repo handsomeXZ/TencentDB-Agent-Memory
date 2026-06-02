@@ -1,0 +1,21 @@
+### npm --prefix apps/memory-visualizer run typecheck 
+
+> @tencentdb-agent-memory/memory-visualizer@0.0.0 typecheck
+> tsc --noEmit
+
+### npm --prefix apps/memory-visualizer test 
+
+> @tencentdb-agent-memory/memory-visualizer@0.0.0 test
+> vitest run
+
+
+ RUN  v4.1.7 D:/ForkWorkSpace/TencentDB-Agent-Memory/apps/memory-visualizer
+
+(node:2372) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ Test Files  9 passed (9)
+      Tests  61 passed (61)
+   Start at  23:21:18
+   Duration  6.56s (transform 507ms, setup 0ms, import 3.21s, tests 6.86s, environment 5.46s)
+

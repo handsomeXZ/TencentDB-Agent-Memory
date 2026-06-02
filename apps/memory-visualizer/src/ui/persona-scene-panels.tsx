@@ -1,5 +1,6 @@
 import type { MouseEvent as ReactMouseEvent } from "react";
 
+import { MetaPair, StateCard, StatusBadge } from "./components";
 import { createUiDashboardSummary } from "./dashboard-summary";
 
 import type { DashboardSnapshot, ParserWarning, SceneBlockSummary } from "../contracts/dashboard";
@@ -29,27 +30,15 @@ export function PersonaSummaryPanel(
                 <div className="table-label">Persona 摘要</div>
                 <h3 className="table-heading">{persona.title}</h3>
               </div>
-              <StatusPill status="available">{formatCapabilityStatus("available")}</StatusPill>
+              <StatusBadge status="available">{formatCapabilityStatus("available")}</StatusBadge>
             </div>
             <div className="table-copy">{persona.contentSummary}</div>
             <div className="scene-preview">{persona.contentPreview}</div>
             <div className="summary-list">
-              <div className="stack-row">
-                <span className="meta-label">Agent 标识</span>
-                <span>{persona.agentId ?? "未记录"}</span>
-              </div>
-              <div className="stack-row">
-                <span className="meta-label">版本</span>
-                <span>{persona.version}</span>
-              </div>
-              <div className="stack-row">
-                <span className="meta-label">更新时间</span>
-                <span className="mono">{formatTimestamp(persona.updatedAtMs)}</span>
-              </div>
-              <div className="stack-row">
-                <span className="meta-label">源提示</span>
-                <span className="mono">{persona.filename}</span>
-              </div>
+              <MetaPair label="Agent 标识" value={persona.agentId ?? "未记录"} />
+              <MetaPair label="版本" value={persona.version} />
+              <MetaPair label="更新时间" value={formatTimestamp(persona.updatedAtMs)} mono />
+              <MetaPair label="源提示" value={persona.filename} mono />
             </div>
           </article>
           <article className="table-card">
@@ -61,9 +50,7 @@ export function PersonaSummaryPanel(
               <span>{persona.sceneIds.length} 个关联</span>
             </div>
             {persona.sceneIds.length === 0 ? (
-              <div className="state-card" data-tone="empty">
-                <div className="state-copy">这个 Persona 摘要没有引用任何 Scene ID。</div>
-              </div>
+              <StateCard tone="empty" detail="这个 Persona 摘要没有引用任何 Scene ID。" />
             ) : (
               <div className="scene-link-list">
                 {persona.sceneIds.map((sceneId) => {
@@ -85,11 +72,7 @@ export function PersonaSummaryPanel(
           </article>
         </div>
       ) : (
-        <article className="state-card" data-tone="warning">
-          <div className="meta-label">Persona 缺失</div>
-          <strong>Persona 文件不可用</strong>
-          <div className="state-copy">{localizeDetail(snapshot.capabilityReport.persona.detail) ?? "当前数据源不包含 Persona 摘要。"}</div>
-        </article>
+        <StateCard tone="warning" label="Persona 缺失" title="Persona 文件不可用" detail={localizeDetail(snapshot.capabilityReport.persona.detail) ?? "当前数据源不包含 Persona 摘要。"} />
       )}
     </section>
   );
@@ -114,9 +97,7 @@ export function RecentSceneUpdatesPanel(
         <span>{items.length} 条可见</span>
       </div>
       {items.length === 0 ? (
-        <article className="state-card" data-tone="empty">
-          <div className="state-copy">当前数据源没有可用的 Scene 更新时间。</div>
-        </article>
+        <StateCard tone="empty" detail="当前数据源没有可用的 Scene 更新时间。" />
       ) : (
         <div className="scene-panel-stack">
           {items.map((item) => (
@@ -153,20 +134,12 @@ export function SceneMapPanel(
     return (
       <div className="route-grid">
         <section className="shell-panel">
-           <h3 className="section-title">Scene Map 告警信息</h3>
-          <article className="state-card" data-tone="warning">
-            <div className="meta-label">Scene 能力</div>
-            <strong>{formatCapabilityStatus(sceneCapability.status)}</strong>
-            <div className="state-copy">{localizeDetail(sceneCapability.detail) ?? "当前数据源没有 Scene Map 条目。"}</div>
-          </article>
+          <h3 className="section-title">Scene Map 告警信息</h3>
+          <StateCard tone="warning" label="Scene 能力" title={formatCapabilityStatus(sceneCapability.status)} detail={localizeDetail(sceneCapability.detail) ?? "当前数据源没有 Scene Map 条目。"} />
         </section>
         <section className="shell-panel">
           <h3 className="section-title">Scene 拓扑</h3>
-          <article className="state-card" data-tone="empty">
-            <div className="meta-label">空状态</div>
-            <strong>没有可用的 Scene Map</strong>
-            <div className="state-copy">这个数据源没有生成任何 Scene 块，但界面仍可继续使用。</div>
-          </article>
+          <StateCard tone="empty" label="空状态" title="没有可用的 Scene Map" detail="这个数据源没有生成任何 Scene 块，但界面仍可继续使用。" />
         </section>
       </div>
     );
@@ -180,43 +153,22 @@ export function SceneMapPanel(
             <div className="table-label">Scene 聚焦</div>
             <h3 className="table-heading">{selectedScene?.title ?? "Scene 详情"}</h3>
           </div>
-          {selectedScene ? <StatusPill status={heatStatus(selectedScene.heatScore)}>{`热度 ${selectedScene.heatScore.toFixed(2)}`}</StatusPill> : null}
+          {selectedScene ? <StatusBadge status={heatStatus(selectedScene.heatScore)}>{`热度 ${selectedScene.heatScore.toFixed(2)}`}</StatusBadge> : null}
         </div>
         {selectedScene ? (
           <div className="scene-panel-stack">
             <div className="table-copy">{selectedScene.contentSummary}</div>
             <div className="scene-preview">{selectedScene.contentPreview}</div>
             <div className="detail-grid">
-              <article className="metric-card">
-                <div className="meta-label">更新时间</div>
-                <div className="metric-subtle mono">{formatTimestamp(selectedScene.updatedAtMs)}</div>
-              </article>
-              <article className="metric-card">
-                <div className="meta-label">Memory 数量</div>
-                <div className="metric-subtle">{selectedScene.memoryCount}</div>
-              </article>
-              <article className="metric-card">
-                <div className="meta-label">Evidence 引用</div>
-                <div className="metric-subtle">{selectedScene.evidenceRecordIds.length}</div>
-              </article>
-              <article className="metric-card">
-                <div className="meta-label">源提示</div>
-                <div className="metric-subtle mono">{selectedScene.filename}</div>
-              </article>
+              <MetaPair label="更新时间" value={formatTimestamp(selectedScene.updatedAtMs)} mono variant="metric" />
+              <MetaPair label="Memory 数量" value={selectedScene.memoryCount} variant="metric" />
+              <MetaPair label="Evidence 引用" value={selectedScene.evidenceRecordIds.length} variant="metric" />
+              <MetaPair label="源提示" value={selectedScene.filename} mono variant="metric" />
             </div>
             <div className="summary-list">
-              <div className="stack-row">
-                <span className="meta-label">Scene ID</span>
-                <span className="mono">{selectedScene.sceneId}</span>
-              </div>
-              <div className="stack-row">
-                <span className="meta-label">路径提示</span>
-                <span className="mono">{selectedScene.sourcePath}</span>
-              </div>
-              <div className="stack-row">
-                <span className="meta-label">关联 Persona</span>
-                <span>{selectedScene.relatedPersonaIds.length}</span>
-              </div>
+              <MetaPair label="Scene ID" value={selectedScene.sceneId} mono />
+              <MetaPair label="路径提示" value={selectedScene.sourcePath} mono />
+              <MetaPair label="关联 Persona" value={selectedScene.relatedPersonaIds.length} />
             </div>
           </div>
         ) : null}
@@ -230,11 +182,7 @@ export function SceneMapPanel(
           <span>{orderedScenes.length} 条总计</span>
         </div>
         {sceneWarnings.length > 0 ? (
-          <article className="state-card" data-tone="warning">
-            <div className="meta-label">解析告警</div>
-            <strong>{sceneWarnings[0]?.code}</strong>
-            <div className="state-copy">{sceneWarnings.map((warning) => `${warning.code}: ${warning.message}`).join(" ")}</div>
-          </article>
+          <StateCard tone="warning" label="解析告警" title={sceneWarnings[0]?.code} detail={sceneWarnings.map((warning) => `${warning.code}: ${warning.message}`).join(" ")} />
         ) : null}
         <div className="scene-panel-stack">
           {orderedScenes.map((scene) => {
@@ -246,27 +194,15 @@ export function SceneMapPanel(
                     <div className="table-label">Scene</div>
                     <h3 className="table-heading">{scene.title}</h3>
                   </div>
-                  <StatusPill status={heatStatus(scene.heatScore)}>{`热度 ${scene.heatScore.toFixed(2)}`}</StatusPill>
+                  <StatusBadge status={heatStatus(scene.heatScore)}>{`热度 ${scene.heatScore.toFixed(2)}`}</StatusBadge>
                 </div>
                 <div className="table-copy">{scene.contentSummary}</div>
                 <div className="scene-preview">{scene.contentPreview}</div>
                 <div className="summary-list">
-                  <div className="stack-row">
-                    <span className="meta-label">更新时间</span>
-                    <span className="mono">{formatTimestamp(scene.updatedAtMs)}</span>
-                  </div>
-                  <div className="stack-row">
-                    <span className="meta-label">Memory 数量</span>
-                    <span>{scene.memoryCount}</span>
-                  </div>
-                  <div className="stack-row">
-                    <span className="meta-label">Evidence 提示</span>
-                    <span>{scene.evidenceRecordIds.length}</span>
-                  </div>
-                  <div className="stack-row">
-                    <span className="meta-label">源提示</span>
-                    <span className="mono">{scene.filename}</span>
-                  </div>
+                  <MetaPair label="更新时间" value={formatTimestamp(scene.updatedAtMs)} mono />
+                  <MetaPair label="Memory 数量" value={scene.memoryCount} />
+                  <MetaPair label="Evidence 提示" value={scene.evidenceRecordIds.length} />
+                  <MetaPair label="源提示" value={scene.filename} mono />
                 </div>
                 <a
                   className="scene-link"
@@ -287,7 +223,7 @@ export function SceneMapPanel(
             <div className="table-label">Persona 覆盖情况</div>
             <h3 className="table-heading">关联 Persona 状态</h3>
           </div>
-          <StatusPill status={snapshot.capabilityReport.persona.status}>{formatCapabilityStatus(snapshot.capabilityReport.persona.status)}</StatusPill>
+          <StatusBadge status={snapshot.capabilityReport.persona.status}>{formatCapabilityStatus(snapshot.capabilityReport.persona.status)}</StatusBadge>
         </div>
         <div className="table-copy">
           {snapshot.persona
@@ -296,14 +232,6 @@ export function SceneMapPanel(
         </div>
       </section>
     </div>
-  );
-}
-
-function StatusPill({ status, children }: { readonly status: DashboardSnapshot["capabilityReport"]["persona"]["status"]; readonly children: string }) {
-  return (
-    <span className="capability-badge" data-status={status}>
-      {children}
-    </span>
   );
 }
 
