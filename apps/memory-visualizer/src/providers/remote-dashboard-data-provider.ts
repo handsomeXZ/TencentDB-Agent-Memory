@@ -15,6 +15,7 @@ import type {
   LocalDashboardRequestConfig,
 } from "./local-dashboard-data-provider";
 import type { GatewayFetch } from "./gateway-debug-adapter";
+import type { RequestTelemetryPage, RequestTelemetrySummary } from "../../../../src/telemetry/request-telemetry.js";
 
 export interface RemoteDashboardDataProviderOptions {
   readonly env?: NodeJS.ProcessEnv;
@@ -75,6 +76,17 @@ export class RemoteDashboardDataProvider {
 
   public async getEvidenceLinkIndex(_config: DataSourceConfig | LocalDashboardRequestConfig = {}): Promise<readonly EvidenceLinkIndexEntry[]> {
     return await this.fetchJson<readonly EvidenceLinkIndexEntry[]>("/visualizer/evidence");
+  }
+
+  public async getRequestTelemetryPage(
+    _config: DataSourceConfig | LocalDashboardRequestConfig = {},
+    page: Partial<Pick<RequestTelemetryPage, "offset" | "limit">> = {},
+  ): Promise<RequestTelemetryPage> {
+    return await this.fetchJson<RequestTelemetryPage>("/visualizer/requests", page);
+  }
+
+  public async getRequestTelemetrySummary(_config: DataSourceConfig | LocalDashboardRequestConfig = {}): Promise<RequestTelemetrySummary> {
+    return await this.fetchJson<RequestTelemetrySummary>("/visualizer/requests/summary");
   }
 
   public resolveConfig(_config: DataSourceConfig | LocalDashboardRequestConfig = {}): DataSourceConfig {

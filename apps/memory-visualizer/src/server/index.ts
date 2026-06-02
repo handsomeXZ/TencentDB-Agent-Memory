@@ -1,7 +1,14 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { URL } from "node:url";
 
+import { REQUEST_TELEMETRY_QUERY_KEY_ALLOWLIST, createSanitizedRequestLog } from "../../../../src/telemetry/request-telemetry.js";
+import {
+  appendRequestTelemetryLog,
+  readRequestTelemetryPage,
+  readRequestTelemetrySummary,
+} from "../../../../src/telemetry/request-telemetry-store.js";
 import { GatewayDebugAdapter } from "../providers/gateway-debug-adapter";
 import { LocalDashboardDataProvider } from "../providers/local-dashboard-data-provider";
 import { RemoteDashboardDataProvider } from "../providers/remote-dashboard-data-provider";
@@ -16,6 +23,13 @@ import type {
 } from "../contracts/dashboard";
 import type { DashboardPage, LocalDashboardProviderConfig, LocalDashboardRequestConfig } from "../providers/local-dashboard-data-provider";
 import type { GatewayFetch, GatewayRequestInit } from "../providers/gateway-debug-adapter";
+import type {
+  RequestTelemetryAuthType,
+  RequestTelemetryPage,
+  RequestTelemetrySummary,
+  RequestTelemetryWarning,
+  SanitizedRequestLog,
+} from "../../../../src/telemetry/request-telemetry.js";
 
 export interface VisualizerServerOptions {
   readonly appConfig?: LocalDashboardProviderConfig;
@@ -61,6 +75,7 @@ export function createVisualizerServer(options: VisualizerServerOptions = {}): S
     const requestUrl = createRequestUrl(request);
     const method = request.method?.toUpperCase() ?? "GET";
     const routeKey = `${method} ${requestUrl.pathname}`;
+    const telemetryStartedAt = Date.now();
 
     try {
       response.setHeader("Cache-Control", "no-store");
@@ -83,6 +98,10 @@ export function createVisualizerServer(options: VisualizerServerOptions = {}): S
           return sendJson(response, 200, await provider.getStructuredMemoriesPage(resolveRequestConfig(provider, requestUrl), readPage(requestUrl)));
         case "GET /api/conversations":
           return sendJson(response, 200, await provider.getConversationEvidencePage(resolveRequestConfig(provider, requestUrl), readPage(requestUrl)));
+        case "GET /api/requests":
+          return sendJson(response, 200, await readRequestsPage(env, provider, requestUrl));
+        case "GET /api/requests/summary":
+          return sendJson(response, 200, await readRequestsSummary(env, provider));
         case "GET /api/offload":
           return sendJson(response, 200, await readOffload(provider, requestUrl));
         case "GET /api/evidence":
@@ -102,8 +121,81 @@ export function createVisualizerServer(options: VisualizerServerOptions = {}): S
       const httpError = toHttpError(error);
       if (!httpError.expose) logUnexpectedError(error);
       return sendJson(response, httpError.status, { error: httpError.message, code: httpError.code } satisfies JsonErrorBody);
+    } finally {
+      await recordVisualizerRequestTelemetry({
+        authType: visualizerTelemetryAuthType(authConfig),
+        env,
+        method,
+        provider,
+        requestUrl,
+        startedAt: telemetryStartedAt,
+        statusCode: response.statusCode,
+      });
     }
   });
+}
+
+async function recordVisualizerRequestTelemetry(input: {
+  readonly authType: RequestTelemetryAuthType;
+  readonly env: NodeJS.ProcessEnv;
+  readonly method: string;
+  readonly provider: DashboardProvider;
+  readonly requestUrl: URL;
+  readonly startedAt: number;
+  readonly statusCode: number;
+}): Promise<void> {
+  const log = createSanitizedRequestLog({
+    id: `request:${randomUUID()}`,
+    source: "visualizer-api",
+    method: input.method,
+    path: input.requestUrl.pathname,
+    query: visualizerTelemetryQueryKeys(input.requestUrl),
+    statusCode: input.statusCode,
+    latencyMs: Date.now() - input.startedAt,
+    authType: input.authType,
+    createdAt: new Date().toISOString(),
+  });
+  if (!log) return;
+
+  try {
+    const result = await appendRequestTelemetryLog(log, {
+      source: "visualizer-api",
+      env: input.env,
+      unsafeRootDirs: visualizerTelemetryUnsafeRoots(input.provider),
+    });
+    logTelemetryWarnings(result.warnings, log);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`Memory Visualizer request telemetry append failed open: ${message}`);
+  }
+}
+
+function visualizerTelemetryAuthType(authConfig: ReturnType<typeof readVisualizerAuthConfig>): RequestTelemetryAuthType {
+  return authConfig.required ? "visualizer_api_key" : "none";
+}
+
+function visualizerTelemetryQueryKeys(requestUrl: URL): URLSearchParams {
+  const query = new URLSearchParams();
+  for (const key of REQUEST_TELEMETRY_QUERY_KEY_ALLOWLIST) {
+    if (requestUrl.searchParams.has(key)) query.set(key, "");
+  }
+  return query;
+}
+
+function visualizerTelemetryUnsafeRoots(provider: DashboardProvider): readonly string[] {
+  try {
+    const config = provider.resolveConfig();
+    return [config.memoryRootPath, config.offloadRootPath].filter((value) => value.trim().length > 0);
+  } catch {
+    return [];
+  }
+}
+
+function logTelemetryWarnings(warnings: readonly { readonly code: string }[], log: SanitizedRequestLog): void {
+  for (const warning of warnings) {
+    if (warning.code === "telemetry-dir-unconfigured") continue;
+    console.warn(`Memory Visualizer request telemetry warning [${log.method} ${log.path}]: ${warning.code}`);
+  }
 }
 
 async function readOffload(provider: DashboardProvider, requestUrl: URL): Promise<{
@@ -117,6 +209,41 @@ async function readOffload(provider: DashboardProvider, requestUrl: URL): Promis
     provider.getOffloadReferencesPage(config, page),
   ]);
   return { canvases, references };
+}
+
+async function readRequestsPage(
+  env: NodeJS.ProcessEnv,
+  provider: DashboardProvider,
+  requestUrl: URL,
+): Promise<RequestTelemetryPage> {
+  if (provider instanceof RemoteDashboardDataProvider) {
+    return sanitizeTelemetryPage(await provider.getRequestTelemetryPage(resolveRequestConfig(provider, requestUrl), readPage(requestUrl)));
+  }
+
+  const result = await readRequestTelemetryPage({
+    env,
+    telemetryDir: configuredVisualizerTelemetryDir(env),
+    unsafeRootDirs: visualizerTelemetryUnsafeRoots(provider),
+    limit: requestUrl.searchParams.get("limit") ?? undefined,
+    offset: requestUrl.searchParams.get("offset") ?? undefined,
+  });
+  if (!result.ok) throw new HttpError(400, result.error.code, result.error.message);
+  return sanitizeTelemetryPage(result.page);
+}
+
+async function readRequestsSummary(
+  env: NodeJS.ProcessEnv,
+  provider: DashboardProvider,
+): Promise<RequestTelemetrySummary> {
+  if (provider instanceof RemoteDashboardDataProvider) {
+    return sanitizeTelemetrySummary(await provider.getRequestTelemetrySummary());
+  }
+
+  return sanitizeTelemetrySummary(await readRequestTelemetrySummary({
+    env,
+    telemetryDir: configuredVisualizerTelemetryDir(env),
+    unsafeRootDirs: visualizerTelemetryUnsafeRoots(provider),
+  }));
 }
 
 function createGatewayAdapter(
@@ -230,6 +357,36 @@ function paginate<T>(items: readonly T[], requestUrl: URL): DashboardPage<T> {
     offset: page.offset,
     limit: page.limit,
   };
+}
+
+function sanitizeTelemetryPage(page: RequestTelemetryPage): RequestTelemetryPage {
+  return {
+    ...page,
+    warnings: sanitizeTelemetryWarnings(page.warnings),
+  };
+}
+
+function sanitizeTelemetrySummary(summary: RequestTelemetrySummary): RequestTelemetrySummary {
+  return {
+    ...summary,
+    warnings: sanitizeTelemetryWarnings(summary.warnings),
+  };
+}
+
+function sanitizeTelemetryWarnings(warnings: readonly RequestTelemetryWarning[]): readonly RequestTelemetryWarning[] {
+  return warnings.map((warning) => ({
+    code: warning.code,
+    message: warning.message,
+    source: warning.source,
+    detail: null,
+  }));
+}
+
+function configuredVisualizerTelemetryDir(env: NodeJS.ProcessEnv): string | undefined {
+  const visualizerDir = env.TDAI_VIS_TELEMETRY_DIR?.trim();
+  if (visualizerDir) return visualizerDir;
+  const sharedDir = env.TDAI_TELEMETRY_DIR?.trim();
+  return sharedDir || undefined;
 }
 
 async function readJsonBody(request: IncomingMessage, maxBytes: number): Promise<unknown> {

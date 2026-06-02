@@ -1,16 +1,26 @@
 import { type Server } from "node:http";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { createVisualizerServer } from "./index";
+import {
+  REQUEST_TELEMETRY_GATEWAY_FILE,
+  REQUEST_TELEMETRY_MAX_LIMIT,
+  REQUEST_TELEMETRY_VISUALIZER_FILE,
+} from "../../../../src/telemetry/request-telemetry-store.js";
 
 import type { GatewayFetch, GatewayFetchResponse, GatewayRequestInit } from "../providers";
+import type { SanitizedRequestLog } from "../../../../src/telemetry/request-telemetry.js";
 
 const appRoot = fileURLToPath(new URL("../..", import.meta.url));
 const fixtureRoot = path.join(appRoot, "fixtures", "complete-data-dir");
 const secret = "sk-test-secret-1234567890";
+const dangerousToken = "secret-token";
+const dangerousCookie = "secret-cookie";
 const visualizerSecret = "vis-test-secret-1234567890";
 
 interface RunningServer {
@@ -19,10 +29,13 @@ interface RunningServer {
 }
 
 const servers: Server[] = [];
+const tempDirs: string[] = [];
 
 afterEach(async () => {
   const pending = servers.splice(0, servers.length);
   await Promise.all(pending.map(closeServer));
+  const dirs = tempDirs.splice(0, tempDirs.length);
+  await Promise.all(dirs.map((dir) => rm(dir, { recursive: true, force: true })));
 });
 
 describe("visualizer read-only API server", () => {
@@ -179,6 +192,42 @@ describe("visualizer read-only API server", () => {
         return jsonResponse(200, { items: [{ recordId: "remote-memory" }], total: 1, offset: 0, limit: 50 });
       }
 
+      if (pathname === "/base/visualizer/requests") {
+        return jsonResponse(200, {
+          items: [{
+            id: "remote-request-2",
+            source: "gateway",
+            method: "GET",
+            path: "/recall",
+            routePattern: "/recall",
+            statusCode: 200,
+            outcome: "ok",
+            latencyMs: 12,
+            authType: "gateway_api_key",
+            createdAt: "2026-06-02T12:00:00.000Z",
+            queryKeys: ["limit"],
+            warningCodes: [],
+          }],
+          total: 3,
+          offset: 1,
+          limit: 2,
+          warnings: [{ code: "telemetry-file-missing", message: "hidden gateway detail", source: "gateway", detail: { path: "Z:/secret-telemetry" } }],
+        });
+      }
+
+      if (pathname === "/base/visualizer/requests/summary") {
+        return jsonResponse(200, {
+          generatedAt: "2026-06-02T12:01:00.000Z",
+          total: 3,
+          last24h: 3,
+          errorRate: 0,
+          p95LatencyMs: 12,
+          recent5xx: [],
+          sources: [{ key: "gateway", count: 3, errorCount: 0, unauthorizedCount: 0, averageLatencyMs: 12 }],
+          warnings: [{ code: "telemetry-file-missing", message: "hidden summary detail", source: "visualizer-api", detail: { file: "Z:/summary-secret" } }],
+        });
+      }
+
       return jsonResponse(404, { error: `unexpected endpoint: ${pathname}` });
     };
     const running = await startServer(gatewayFetch, 50, visualizerSecret, {
@@ -189,15 +238,30 @@ describe("visualizer read-only API server", () => {
 
     const snapshot = await getJson(`${running.baseUrl}/api/snapshot?dataDir=../../local-should-be-ignored`, authHeaders(visualizerSecret));
     const memories = await getJson(`${running.baseUrl}/api/memories`, authHeaders(visualizerSecret));
+    const requests = await getJson(`${running.baseUrl}/api/requests?limit=2&offset=1`, authHeaders(visualizerSecret));
+    const requestsSummary = await getJson(`${running.baseUrl}/api/requests/summary`, authHeaders(visualizerSecret));
 
     expect(snapshot.status).toBe(200);
     expect(snapshot.body).toMatchObject({ snapshotId: "remote:snapshot", persona: { profileId: "remote-persona" } });
     expect(memories.status).toBe(200);
     expect(memories.body).toMatchObject({ total: 1, items: [expect.objectContaining({ recordId: "remote-memory" })] });
+    expect(requests.status).toBe(200);
+    expect(requests.body).toMatchObject({ total: 3, offset: 1, limit: 2, items: [expect.objectContaining({ id: "remote-request-2" })] });
+    expect(requests.body.warnings).toEqual([
+      expect.objectContaining({ code: "telemetry-file-missing", source: "gateway", detail: null }),
+    ]);
+    expect(requestsSummary.status).toBe(200);
+    expect(requestsSummary.body).toMatchObject({ total: 3, sources: [expect.objectContaining({ key: "gateway", count: 3 })] });
+    expect(requestsSummary.body.warnings).toEqual([
+      expect.objectContaining({ code: "telemetry-file-missing", source: "visualizer-api", detail: null }),
+    ]);
     expect(calls.map((call) => new URL(call.url).pathname)).toEqual([
       "/base/visualizer/snapshot",
       "/base/visualizer/memories",
+      "/base/visualizer/requests",
+      "/base/visualizer/requests/summary",
     ]);
+    expect(new URL(calls[2]?.url ?? "http://missing.test").search).toBe("?offset=1&limit=2");
     expect(calls.every((call) => call.authorization === `Bearer ${secret}`)).toBe(true);
   });
 
@@ -238,6 +302,265 @@ describe("visualizer read-only API server", () => {
     expect(body).toMatchObject({ code: "malformed-json" });
   });
 
+  it("records sanitized Visualizer API telemetry for reads, auth failures, debug proxy calls, malformed JSON, and 404", async () => {
+    const telemetryDir = await tempDir("tdai-visualizer-telemetry-");
+    const gatewayFetch: GatewayFetch = async (input) => {
+      const pathname = new URL(input.toString()).pathname;
+      if (pathname === "/recall") return jsonResponse(200, { context: "remember alpha", strategy: "hybrid", memory_count: 1 });
+      if (pathname === "/search/memories") return jsonResponse(500, { error: "gateway failed" });
+      return jsonResponse(404, { error: "unexpected endpoint" });
+    };
+    const running = await startServer(gatewayFetch, 50, visualizerSecret, { TDAI_VIS_TELEMETRY_DIR: telemetryDir });
+
+    const unauthorized = await getJson(`${running.baseUrl}/api/snapshot`);
+    const snapshot = await getJson(`${running.baseUrl}/api/snapshot?limit=1&token=secret-token&sourceLabel=fixture-secret`, authHeaders(visualizerSecret));
+    const memories = await getJson(`${running.baseUrl}/api/memories?offset=1&limit=1&source=client-secret-source`, authHeaders(visualizerSecret));
+    const recall = await postJson(`${running.baseUrl}/api/gateway/recall-debug`, {
+      query: "my-secret-password",
+      session_key: "session-alpha",
+    }, { ...authHeaders(visualizerSecret), Cookie: `${dangerousCookie}=1` });
+    const gatewayFailure = await postJson(`${running.baseUrl}/api/gateway/search-memories-debug`, {
+      query: "gateway failure secret",
+    }, authHeaders(visualizerSecret));
+    const malformed = await fetch(`${running.baseUrl}/api/gateway/recall-debug`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders(visualizerSecret) },
+      body: "{not-json",
+    });
+    const missing = await getJson(`${running.baseUrl}/api/missing-route?status=raw-status-value`, authHeaders(visualizerSecret));
+    const production = await startServer(undefined, 50, undefined, { NODE_ENV: "production", TDAI_VIS_TELEMETRY_DIR: telemetryDir });
+    const authNotConfigured = await getJson(`${production.baseUrl}/api/snapshot`);
+
+    expect(unauthorized).toMatchObject({ status: 401 });
+    expect(snapshot).toMatchObject({ status: 200 });
+    expect(memories).toMatchObject({ status: 200 });
+    expect(recall.body).toMatchObject({ ok: true, endpoint: "/recall" });
+    expect(gatewayFailure.body).toMatchObject({ ok: false, endpoint: "/search/memories", httpStatus: 500 });
+    expect(malformed.status).toBe(400);
+    expect(missing).toMatchObject({ status: 404 });
+    expect(authNotConfigured).toMatchObject({ status: 503 });
+
+    const records = await waitForVisualizerRecords(telemetryDir, 8);
+    expect(records).toHaveLength(8);
+    expect(records.every((record) => record.source === "visualizer-api")).toBe(true);
+    expect(records).toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: "/api/snapshot", statusCode: 401, outcome: "unauthorized", routePattern: "/api/*", authType: "visualizer_api_key" }),
+      expect.objectContaining({ path: "/api/snapshot", statusCode: 200, outcome: "ok", routePattern: "/api/*", authType: "visualizer_api_key" }),
+      expect.objectContaining({ path: "/api/memories", statusCode: 200, outcome: "ok", routePattern: "/api/*" }),
+      expect.objectContaining({ path: "/api/gateway/recall-debug", statusCode: 200, routePattern: "/api/*" }),
+      expect.objectContaining({ path: "/api/gateway/search-memories-debug", statusCode: 200, routePattern: "/api/*" }),
+      expect.objectContaining({ path: "/api/gateway/recall-debug", statusCode: 400, routePattern: "/api/*" }),
+      expect.objectContaining({ path: "/api/missing-route", statusCode: 404, routePattern: "/api/*" }),
+      expect.objectContaining({ path: "/api/snapshot", statusCode: 503, outcome: "error", routePattern: "/api/*", authType: "visualizer_api_key" }),
+    ]));
+    expect(findVisualizerRecord(records, "/api/snapshot", 200).queryKeys).toEqual(["limit"]);
+    expect(findVisualizerRecord(records, "/api/memories", 200).queryKeys).toEqual(["limit", "offset", "source"]);
+    expect(findVisualizerRecord(records, "/api/missing-route", 404).queryKeys).toEqual(["status"]);
+
+    const serialized = JSON.stringify(records);
+    for (const forbidden of [
+      "my-secret-password",
+      "session-alpha",
+      "gateway failure secret",
+      dangerousToken,
+      dangerousCookie,
+      "fixture-secret",
+      "client-secret-source",
+      "raw-status-value",
+      visualizerSecret,
+      "Authorization",
+      "Cookie",
+      "Bearer",
+      "token=",
+    ]) {
+      expect(serialized).not.toContain(forbidden);
+    }
+  });
+
+  it("records body-too-large as sanitized Visualizer telemetry without persisting the body", async () => {
+    const telemetryDir = await tempDir("tdai-visualizer-telemetry-large-");
+    const running = await startServer(undefined, 50, visualizerSecret, { TDAI_VIS_TELEMETRY_DIR: telemetryDir }, 12);
+
+    const response = await fetch(`${running.baseUrl}/api/gateway/recall-debug`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders(visualizerSecret) },
+      body: JSON.stringify({ query: "my-secret-password", session_key: "session-alpha" }),
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(413);
+    expect(body).toMatchObject({ code: "body-too-large" });
+    const records = await waitForVisualizerRecords(telemetryDir, 1);
+    expect(records).toEqual([expect.objectContaining({ path: "/api/gateway/recall-debug", statusCode: 413, source: "visualizer-api" })]);
+    expect(JSON.stringify(records)).not.toContain("my-secret-password");
+    expect(JSON.stringify(records)).not.toContain("session-alpha");
+  });
+
+  it("serves merged request telemetry pagination with capped limit and offset after merge", async () => {
+    const telemetryDir = await tempDir("tdai-visualizer-requests-page-");
+    await seedRequestTelemetryLogs(telemetryDir, createMergedTelemetryFixtures());
+    const running = await startServer(undefined, 50, visualizerSecret, { TDAI_VIS_TELEMETRY_DIR: telemetryDir });
+
+    const page = await getJson(`${running.baseUrl}/api/requests?limit=20`, authHeaders(visualizerSecret));
+    const capped = await getJson(`${running.baseUrl}/api/requests?limit=99999`, authHeaders(visualizerSecret));
+    const offset = await getJson(`${running.baseUrl}/api/requests?offset=10`, authHeaders(visualizerSecret));
+
+    expect(page.status).toBe(200);
+    expect(page.body).toMatchObject({ total: 14, offset: 0, limit: 20 });
+    expect((page.body.items as readonly Record<string, unknown>[]).slice(0, 3).map((item) => item.id)).toEqual([
+      "visualizer-01",
+      "gateway-01",
+      "visualizer-02",
+    ]);
+
+    expect(capped.status).toBe(200);
+    expect(capped.body).toMatchObject({ total: 14, offset: 0, limit: REQUEST_TELEMETRY_MAX_LIMIT });
+    expect(capped.body.warnings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "telemetry-limit-capped", detail: null }),
+    ]));
+
+    expect(offset.status).toBe(200);
+    expect(offset.body).toMatchObject({ total: 14, offset: 10, limit: 50 });
+    expect((offset.body.items as readonly Record<string, unknown>[]).map((item) => item.id)).toEqual([
+      "visualizer-06",
+      "gateway-06",
+      "visualizer-07",
+      "gateway-07",
+    ]);
+  });
+
+  it("returns sanitized 400 for invalid request telemetry pagination", async () => {
+    const telemetryDir = await tempDir("tdai-visualizer-requests-invalid-");
+    await seedRequestTelemetryLogs(telemetryDir, createMergedTelemetryFixtures());
+    const running = await startServer(undefined, 50, visualizerSecret, { TDAI_VIS_TELEMETRY_DIR: telemetryDir });
+
+    const invalidLimit = await getJson(`${running.baseUrl}/api/requests?limit=abc`, authHeaders(visualizerSecret));
+    const negativeLimit = await getJson(`${running.baseUrl}/api/requests?limit=-1`, authHeaders(visualizerSecret));
+    const negativeOffset = await getJson(`${running.baseUrl}/api/requests?offset=-3`, authHeaders(visualizerSecret));
+
+    for (const response of [invalidLimit, negativeLimit, negativeOffset]) {
+      expect(response.status).toBe(400);
+      expect(response.body).toMatchObject({ code: "invalid-telemetry-pagination" });
+      expect(JSON.stringify(response.body)).not.toContain(telemetryDir);
+    }
+  });
+
+  it("returns empty merged telemetry pages with warnings when telemetry files are missing", async () => {
+    const telemetryDir = await tempDir("tdai-visualizer-requests-empty-");
+    const running = await startServer(undefined, 50, visualizerSecret, { TDAI_VIS_TELEMETRY_DIR: telemetryDir });
+
+    const page = await getJson(`${running.baseUrl}/api/requests`, authHeaders(visualizerSecret));
+    const summary = await getJson(`${running.baseUrl}/api/requests/summary`, authHeaders(visualizerSecret));
+
+    expect(page.status).toBe(200);
+    expect(page.body).toMatchObject({ items: [], total: 0, offset: 0, limit: 50 });
+    expect(page.body.warnings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "telemetry-file-missing", source: "gateway", detail: null }),
+      expect.objectContaining({ code: "telemetry-file-missing", source: "visualizer-api", detail: null }),
+    ]));
+    expect(JSON.stringify(page.body)).not.toContain(telemetryDir);
+
+    expect(summary.status).toBe(200);
+    expect(summary.body).toMatchObject({
+      total: 0,
+      last24h: 0,
+      errorRate: 0,
+      p95LatencyMs: null,
+      recent5xx: [],
+      sources: [],
+    });
+    expect(summary.body.warnings).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "telemetry-file-missing", source: "gateway", detail: null }),
+      expect.objectContaining({ code: "telemetry-file-missing", source: "visualizer-api", detail: null }),
+    ]));
+  });
+
+  it("requires visualizer auth for request telemetry routes", async () => {
+    const telemetryDir = await tempDir("tdai-visualizer-requests-auth-");
+    await seedRequestTelemetryLogs(telemetryDir, createMergedTelemetryFixtures());
+    const running = await startServer(undefined, 50, visualizerSecret, { TDAI_VIS_TELEMETRY_DIR: telemetryDir });
+
+    const missing = await getJson(`${running.baseUrl}/api/requests`);
+    const wrong = await getJson(`${running.baseUrl}/api/requests/summary`, authHeaders("wrong-token"));
+    const valid = await getJson(`${running.baseUrl}/api/requests`, authHeaders(visualizerSecret));
+
+    expect(missing).toMatchObject({ status: 401, body: { code: "unauthorized" } });
+    expect(wrong).toMatchObject({ status: 401, body: { code: "unauthorized" } });
+    expect(valid).toMatchObject({ status: 200, body: { total: 14 } });
+  });
+
+  it("serves request telemetry summary fields from merged gateway and visualizer logs", async () => {
+    const telemetryDir = await tempDir("tdai-visualizer-requests-summary-");
+    await seedRequestTelemetryLogs(telemetryDir, createMergedTelemetryFixtures());
+    const running = await startServer(undefined, 50, visualizerSecret, { TDAI_VIS_TELEMETRY_DIR: telemetryDir });
+
+    const summary = await getJson(`${running.baseUrl}/api/requests/summary`, authHeaders(visualizerSecret));
+
+    expect(summary.status).toBe(200);
+    expect(summary.body).toMatchObject({
+      total: 14,
+      last24h: 13,
+      errorRate: 0.214,
+      p95LatencyMs: 950,
+      sources: [
+        expect.objectContaining({ key: "visualizer-api", count: 7, errorCount: 1, unauthorizedCount: 1, averageLatencyMs: 313 }),
+        expect.objectContaining({ key: "gateway", count: 7, errorCount: 2, unauthorizedCount: 1, averageLatencyMs: 509 }),
+      ],
+    });
+    expect(summary.body.recent5xx).toEqual([
+      expect.objectContaining({ id: "gateway-03", statusCode: 500, source: "gateway" }),
+      expect.objectContaining({ id: "gateway-05", statusCode: 502, source: "gateway" }),
+      expect.objectContaining({ id: "visualizer-06", statusCode: 503, source: "visualizer-api" }),
+    ]);
+    expect(summary.body.warnings).toEqual([]);
+    expect(JSON.stringify(summary.body)).not.toContain(telemetryDir);
+  });
+
+  it("skips request monitor, health, and static asset routes", async () => {
+    const telemetryDir = await tempDir("tdai-visualizer-telemetry-skip-");
+    const running = await startServer(undefined, 50, visualizerSecret, { TDAI_VIS_TELEMETRY_DIR: telemetryDir });
+
+    expect(await getJson(`${running.baseUrl}/health`)).toMatchObject({ status: 200 });
+    expect(await getJson(`${running.baseUrl}/api/requests`, authHeaders(visualizerSecret))).toMatchObject({ status: 200 });
+    expect(await getJson(`${running.baseUrl}/api/requests/summary`, authHeaders(visualizerSecret))).toMatchObject({ status: 200 });
+    expect(await getJson(`${running.baseUrl}/assets/app.js`, authHeaders(visualizerSecret))).toMatchObject({ status: 404 });
+
+    await waitForTelemetryIdle();
+    expect(await readVisualizerRecords(telemetryDir)).toEqual([]);
+  });
+
+  it("resolves Visualizer telemetry env before shared telemetry env and disables telemetry when unset", async () => {
+    const visualizerTelemetryDir = await tempDir("tdai-visualizer-telemetry-specific-");
+    const sharedTelemetryDir = await tempDir("tdai-visualizer-telemetry-shared-");
+    const running = await startServer(undefined, 50, undefined, {
+      TDAI_VIS_TELEMETRY_DIR: visualizerTelemetryDir,
+      TDAI_TELEMETRY_DIR: sharedTelemetryDir,
+    });
+
+    expect(await getJson(`${running.baseUrl}/api/snapshot`)).toMatchObject({ status: 200 });
+    expect(await waitForVisualizerRecords(visualizerTelemetryDir, 1)).toHaveLength(1);
+    expect(await readVisualizerRecords(sharedTelemetryDir)).toEqual([]);
+
+    const disabled = await startServer();
+    expect(await getJson(`${disabled.baseUrl}/api/snapshot`)).toMatchObject({ status: 200 });
+    await waitForTelemetryIdle();
+    expect(await readVisualizerRecords(visualizerTelemetryDir)).toHaveLength(1);
+    expect(await readVisualizerRecords(sharedTelemetryDir)).toEqual([]);
+  });
+
+  it("fails open when Visualizer telemetry storage cannot append", async () => {
+    const root = await tempDir("tdai-visualizer-telemetry-failopen-");
+    const telemetryFilePath = path.join(root, "not-a-directory");
+    await writeFile(telemetryFilePath, "occupied", "utf-8");
+    const running = await startServer(undefined, 50, undefined, { TDAI_VIS_TELEMETRY_DIR: telemetryFilePath });
+
+    const response = await getJson(`${running.baseUrl}/api/snapshot`);
+
+    expect(response).toMatchObject({ status: 200, body: { persona: { profileId: "profile:v1:fixture" } } });
+    await waitForTelemetryIdle();
+    await expect(readFile(telemetryFilePath, "utf-8")).resolves.toBe("occupied");
+  });
+
   it("redacts unexpected internal API errors from clients while logging server details", async () => {
     const internalMessage = "secret provider failure from test";
     const logger = vi.spyOn(console, "error").mockImplementation(() => undefined);
@@ -272,6 +595,7 @@ async function startServer(
   gatewayTimeoutMs = 50,
   visualizerApiKey?: string,
   extraEnv: NodeJS.ProcessEnv = {},
+  maxBodyBytes?: number,
 ): Promise<RunningServer> {
   const server = createVisualizerServer({
     appConfig: {
@@ -287,6 +611,7 @@ async function startServer(
     },
     fetch: gatewayFetch,
     gatewayTimeoutMs,
+    maxBodyBytes,
   });
   servers.push(server);
   await new Promise<void>((resolve, reject) => {
@@ -310,13 +635,113 @@ async function getJson(url: string, headers?: HeadersInit): Promise<{ readonly s
   return { status: response.status, body: await response.json() };
 }
 
-async function postJson(url: string, body: Record<string, unknown>): Promise<{ readonly status: number; readonly body: Record<string, unknown> }> {
+async function postJson(url: string, body: Record<string, unknown>, headers?: HeadersInit): Promise<{ readonly status: number; readonly body: Record<string, unknown> }> {
   const response = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", ...(headers ?? {}) },
     body: JSON.stringify(body),
   });
   return { status: response.status, body: await response.json() };
+}
+
+async function tempDir(prefix: string): Promise<string> {
+  const dir = await mkdtemp(path.join(tmpdir(), prefix));
+  tempDirs.push(dir);
+  return dir;
+}
+
+async function seedRequestTelemetryLogs(
+  telemetryDir: string,
+  fixtures: { readonly gateway: readonly SanitizedRequestLog[]; readonly visualizer: readonly SanitizedRequestLog[] },
+): Promise<void> {
+  await writeFile(
+    path.join(telemetryDir, REQUEST_TELEMETRY_GATEWAY_FILE),
+    `${fixtures.gateway.map((record) => JSON.stringify(record)).join("\n")}\n`,
+    "utf-8",
+  );
+  await writeFile(
+    path.join(telemetryDir, REQUEST_TELEMETRY_VISUALIZER_FILE),
+    `${fixtures.visualizer.map((record) => JSON.stringify(record)).join("\n")}\n`,
+    "utf-8",
+  );
+}
+
+function createMergedTelemetryFixtures(): {
+  readonly gateway: readonly SanitizedRequestLog[];
+  readonly visualizer: readonly SanitizedRequestLog[];
+} {
+  return {
+    gateway: [
+      telemetryRecord("gateway", 1, { createdAt: "2026-06-02T11:59:00.000Z", latencyMs: 120 }),
+      telemetryRecord("gateway", 2, { createdAt: "2026-06-02T11:57:00.000Z", latencyMs: 210 }),
+      telemetryRecord("gateway", 3, { createdAt: "2026-06-02T11:55:00.000Z", latencyMs: 450, statusCode: 500, outcome: "error" }),
+      telemetryRecord("gateway", 4, { createdAt: "2026-06-02T11:53:00.000Z", latencyMs: 300, statusCode: 401, outcome: "unauthorized" }),
+      telemetryRecord("gateway", 5, { createdAt: "2026-06-02T11:51:00.000Z", latencyMs: 720, statusCode: 502, outcome: "error" }),
+      telemetryRecord("gateway", 6, { createdAt: "2026-06-02T11:49:00.000Z", latencyMs: 810 }),
+      telemetryRecord("gateway", 7, { createdAt: "2026-05-31T10:00:00.000Z", latencyMs: 950 }),
+    ],
+    visualizer: [
+      telemetryRecord("visualizer", 1, { createdAt: "2026-06-02T12:00:00.000Z", latencyMs: 90 }),
+      telemetryRecord("visualizer", 2, { createdAt: "2026-06-02T11:58:00.000Z", latencyMs: 110 }),
+      telemetryRecord("visualizer", 3, { createdAt: "2026-06-02T11:56:00.000Z", latencyMs: 130 }),
+      telemetryRecord("visualizer", 4, { createdAt: "2026-06-02T11:54:00.000Z", latencyMs: 170 }),
+      telemetryRecord("visualizer", 5, { createdAt: "2026-06-02T11:52:00.000Z", latencyMs: 240 }),
+      telemetryRecord("visualizer", 6, { createdAt: "2026-06-02T11:50:00.000Z", latencyMs: 900, statusCode: 503, outcome: "error" }),
+      telemetryRecord("visualizer", 7, { createdAt: "2026-06-01T10:00:00.000Z", latencyMs: 550, statusCode: 401, outcome: "unauthorized" }),
+    ],
+  };
+}
+
+function telemetryRecord(
+  source: "gateway" | "visualizer",
+  index: number,
+  overrides: Partial<SanitizedRequestLog> & Pick<SanitizedRequestLog, "createdAt">,
+): SanitizedRequestLog {
+  const isGateway = source === "gateway";
+  const { createdAt, ...rest } = overrides;
+  return {
+    id: `${source}-${String(index).padStart(2, "0")}`,
+    source: isGateway ? "gateway" : "visualizer-api",
+    method: "GET",
+    path: isGateway ? "/recall" : "/api/snapshot",
+    routePattern: isGateway ? "/recall" : "/api/*",
+    statusCode: 200,
+    outcome: "ok",
+    latencyMs: 100,
+    authType: isGateway ? "gateway_api_key" : "visualizer_api_key",
+    createdAt,
+    queryKeys: [],
+    warningCodes: [],
+    ...rest,
+  };
+}
+
+async function waitForVisualizerRecords(telemetryDir: string, count: number): Promise<readonly SanitizedRequestLog[]> {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const records = await readVisualizerRecords(telemetryDir);
+    if (records.length >= count) return records;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  return readVisualizerRecords(telemetryDir);
+}
+
+async function readVisualizerRecords(telemetryDir: string): Promise<readonly SanitizedRequestLog[]> {
+  try {
+    const content = await readFile(path.join(telemetryDir, REQUEST_TELEMETRY_VISUALIZER_FILE), "utf-8");
+    return content.trim().split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line) as SanitizedRequestLog);
+  } catch {
+    return [];
+  }
+}
+
+async function waitForTelemetryIdle(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 80));
+}
+
+function findVisualizerRecord(records: readonly SanitizedRequestLog[], pathName: string, statusCode: number): SanitizedRequestLog {
+  const record = records.find((candidate) => candidate.path === pathName && candidate.statusCode === statusCode);
+  if (!record) throw new Error(`Missing telemetry record for ${pathName} ${statusCode}.`);
+  return record;
 }
 
 function jsonResponse(status: number, body: Record<string, unknown>): GatewayFetchResponse {

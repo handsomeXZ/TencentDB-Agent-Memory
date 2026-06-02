@@ -1,0 +1,44 @@
+﻿
+ RUN  v4.1.7 D:/ForkWorkSpace/TencentDB-Agent-Memory/apps/memory-visualizer
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed | 13 skipped (14)
+   Start at  09:34:33
+   Duration  431ms (transform 96ms, setup 0ms, import 208ms, tests 86ms, environment 0ms)
+
+
+--- full npm --prefix apps/memory-visualizer test ---
+
+> @tencentdb-agent-memory/memory-visualizer@0.0.0 test
+> vitest run
+
+
+ RUN  v4.1.7 D:/ForkWorkSpace/TencentDB-Agent-Memory/apps/memory-visualizer
+
+node.exe : (node:1944) ExperimentalWarning: SQLite is an experimental feature and might change at any time
+所在位置 D:\Install\WorkSpace\NodeJs\npm.ps1:29 字符: 3
++   & $NODE_EXE $NPM_CLI_JS $args
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ((node:1944) Exp...nge at any time:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+ Test Files  9 passed (9)
+      Tests  67 passed (67)
+   Start at  09:34:42
+   Duration  6.51s (transform 821ms, setup 0ms, import 3.82s, tests 7.32s, environment 5.45s)
+
+
+--- Task 7 typecheck retry verification 2026-06-02 ---
+Fix: src/telemetry/request-telemetry-store.ts now decodes readFile content through explicit string/Buffer helpers and builds RequestTelemetrySummaryBucket entries with an explicitly typed array. No telemetry schema, privacy fields, append-only behavior, read windowing, summary behavior, warning behavior, Visualizer auth behavior, or Task 7 Visualizer wrapper semantics were changed.
+Verification:
+- lsp_diagnostics src/telemetry/request-telemetry-store.ts: no diagnostics
+- lsp_diagnostics apps/memory-visualizer/src/server/index.ts: no diagnostics
+- lsp_diagnostics apps/memory-visualizer/src/server/server.test.ts: no diagnostics
+- npm --prefix apps/memory-visualizer run typecheck: passed
+- npm --prefix apps/memory-visualizer test -- src/server/server.test.ts: 1 file passed, 14 tests passed
+- npm --prefix apps/memory-visualizer test: 9 files passed, 67 tests passed
+- npm test: 11 files passed, 100 tests passed
+- rg scan over src/telemetry/request-telemetry-store.ts for as any, @ts-ignore, TODO, FIXME, HACK, and console.debug: no matches

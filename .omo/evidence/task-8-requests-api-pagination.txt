@@ -1,0 +1,3 @@
+﻿Task 8 evidence: request telemetry pagination API targeted test passed.
+Command: npx vitest run src/server/server.test.ts --testNamePattern "serves merged request telemetry pagination with capped limit and offset after merge"
+Result: 1 test passed, 18 skipped.
