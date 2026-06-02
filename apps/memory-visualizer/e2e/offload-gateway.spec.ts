@@ -2,10 +2,10 @@ import path from "node:path";
 
 import { expect, test } from "@playwright/test";
 
-import { startVisualizerHarness } from "./helpers/visualizer-harness";
+import { resolveVisualizerFixturePath, startVisualizerHarness } from "./helpers/visualizer-harness";
 
 test("offload invalid Mermaid falls back safely in browser", async ({ page }) => {
-  const fixtureRoot = path.resolve("apps/memory-visualizer/fixtures/offload-invalid-mermaid");
+  const fixtureRoot = resolveVisualizerFixturePath("offload-invalid-mermaid");
   const harness = await startVisualizerHarness({
     dataDir: fixtureRoot,
     offloadRootPath: path.join(fixtureRoot, "offload"),

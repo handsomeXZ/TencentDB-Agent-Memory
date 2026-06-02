@@ -1,0 +1,37 @@
+Task 10 Requests Monitor verification evidence
+Timestamp: 2026-06-02T10:17:39.9933447+08:00
+
+Commands run
+- npm --prefix apps/memory-visualizer run typecheck
+  Result: PASS
+- npm --prefix apps/memory-visualizer test
+  Result: PASS (10 files, 75 tests)
+- npm --prefix apps/memory-visualizer run build
+  Result: PASS
+- npm --prefix apps/memory-visualizer exec playwright test e2e/shell.spec.ts e2e/requests-monitor.spec.ts
+  Result: PASS (3 tests)
+- Test-Path -LiteralPath ".omo/evidence/task-10-requests-monitor.png"
+  Result: True
+
+Forbidden-control scan
+- Exact command from plan:
+  rg "retry|replay|delete|clear logs|export|edit|capture|seed|session-end" apps/memory-visualizer/src/ui
+- Result summary:
+  The scan returns existing TypeScript `export` declarations across many UI modules, plus non-control route-pattern/classifier strings such as `/capture` and `/seed` inside request classification logic.
+  It does not demonstrate any executable mutation controls in the Requests Monitor UI surface.
+
+Requests Monitor route-specific review
+- The implemented route exposes only these user-facing controls:
+  - `刷新窗口`
+  - `上一页`
+  - `下一页`
+  - read-only filter dropdowns for source/result/type
+  - row selection to open the sanitized detail drawer
+- No retry, replay, delete, clear logs, export, edit, capture, seed, or session-end control was added to the Requests Monitor page.
+
+Browser verification
+- Opened the real browser surface through Playwright harness.
+- Navigated to `/requests-monitor`.
+- Observed visible compact table rows for both Gateway and Visualizer API telemetry.
+- Clicked a request row and observed the sanitized drawer with query key names and warning codes only.
+- Confirmed the screenshot artifact was saved to `.omo/evidence/task-10-requests-monitor.png`.

@@ -32,7 +32,12 @@ export interface VisualizerHarnessOptions {
   readonly offloadRootPath?: string;
   readonly gatewayBaseUrl?: string | null;
   readonly gatewayFetch?: GatewayFetch;
+  readonly telemetryDir?: string;
   readonly visualizerApiKey?: string;
+}
+
+export function resolveVisualizerFixturePath(...paths: string[]): string {
+  return resolve(fixturesRoot, ...paths);
 }
 
 export async function startVisualizerHarness(options: VisualizerHarnessOptions = {}): Promise<VisualizerHarness> {
@@ -42,7 +47,10 @@ export async function startVisualizerHarness(options: VisualizerHarnessOptions =
       offloadRootPath: options.offloadRootPath ?? join(options.dataDir ?? completeDataDir, "offload"),
       gatewayBaseUrl: options.gatewayBaseUrl ?? null,
     },
-    env: options.visualizerApiKey ? { TDAI_VIS_API_KEY: options.visualizerApiKey } : undefined,
+    env: {
+      ...(options.visualizerApiKey ? { TDAI_VIS_API_KEY: options.visualizerApiKey } : {}),
+      ...(options.telemetryDir ? { TDAI_VIS_TELEMETRY_DIR: options.telemetryDir } : {}),
+    },
     fetch: options.gatewayFetch,
   });
   await listenServer(apiServer);

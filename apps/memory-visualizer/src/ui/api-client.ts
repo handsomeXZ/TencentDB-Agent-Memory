@@ -12,6 +12,7 @@ import type {
   SceneBlockSummary,
   StructuredMemorySummary,
 } from "../contracts/dashboard";
+import type { RequestTelemetryPage, RequestTelemetrySummary } from "../../../../src/telemetry/request-telemetry.js";
 
 import type { DashboardPage } from "../providers";
 
@@ -39,6 +40,8 @@ export interface DashboardApiClient {
   readonly getEvidence: (config: SourceQueryConfig, page?: PageRequest) => Promise<DashboardPage<EvidenceLinkIndexEntry>>;
   readonly getConversations: (config: SourceQueryConfig, page?: PageRequest) => Promise<DashboardPage<ConversationEvidence>>;
   readonly getOffload: (config: SourceQueryConfig) => Promise<OffloadResponse>;
+  readonly getRequests: (config: SourceQueryConfig, page?: PageRequest) => Promise<RequestTelemetryPage>;
+  readonly getRequestsSummary: (config: SourceQueryConfig) => Promise<RequestTelemetrySummary>;
   readonly getGatewayHealth: (config: SourceQueryConfig) => Promise<GatewayDebugPayload<HealthDebugData>>;
   readonly runGatewayRecallDebug: (config: SourceQueryConfig, body: GatewayRecallRequest) => Promise<GatewayDebugPayload<RecallDebugData>>;
   readonly runGatewayMemorySearchDebug: (config: SourceQueryConfig, body: GatewayMemorySearchRequest) => Promise<GatewayDebugPayload<MemorySearchDebugData>>;
@@ -106,6 +109,8 @@ export function createDashboardApiClient(baseUrl = "", options: DashboardApiClie
     getEvidence: (config, page) => fetchJson<DashboardPage<EvidenceLinkIndexEntry>>(buildApiUrl(baseUrl, "/api/evidence", config, page), options),
     getConversations: (config, page) => fetchJson<DashboardPage<ConversationEvidence>>(buildApiUrl(baseUrl, "/api/conversations", config, page), options),
     getOffload: (config) => fetchJson<OffloadResponse>(buildApiUrl(baseUrl, "/api/offload", config), options),
+    getRequests: (config, page) => fetchJson<RequestTelemetryPage>(buildApiUrl(baseUrl, "/api/requests", config, page), options),
+    getRequestsSummary: (config) => fetchJson<RequestTelemetrySummary>(buildApiUrl(baseUrl, "/api/requests/summary", config), options),
     getGatewayHealth: (config) => fetchJson<GatewayDebugPayload<HealthDebugData>>(buildApiUrl(baseUrl, "/api/gateway/health", config), options),
     runGatewayRecallDebug: (config, body) => postJson<GatewayDebugPayload<RecallDebugData>>(buildApiUrl(baseUrl, "/api/gateway/recall-debug", config), body, options),
     runGatewayMemorySearchDebug: (config, body) => postJson<GatewayDebugPayload<MemorySearchDebugData>>(buildApiUrl(baseUrl, "/api/gateway/search-memories-debug", config), body, options),

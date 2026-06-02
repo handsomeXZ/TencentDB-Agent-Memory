@@ -2,7 +2,7 @@ import path from "node:path";
 
 import { expect, test } from "@playwright/test";
 
-import { startVisualizerHarness } from "./helpers/visualizer-harness";
+import { resolveVisualizerFixturePath, startVisualizerHarness } from "./helpers/visualizer-harness";
 
 test("memory filters narrow persona records and update visible summaries", async ({ page }) => {
   const harness = await startVisualizerHarness();
@@ -29,7 +29,7 @@ test("memory filters narrow persona records and update visible summaries", async
 });
 
 test("memory evidence drill-down warns when source evidence is missing", async ({ page }) => {
-  const fixtureRoot = path.resolve("apps/memory-visualizer/fixtures/missing-evidence");
+  const fixtureRoot = resolveVisualizerFixturePath("missing-evidence");
   const harness = await startVisualizerHarness({
     dataDir: fixtureRoot,
     offloadRootPath: path.join(fixtureRoot, "offload"),

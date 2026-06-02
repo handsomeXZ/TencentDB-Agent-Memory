@@ -2,7 +2,7 @@ import path from "node:path";
 
 import { expect, test } from "@playwright/test";
 
-import { startVisualizerHarness } from "./helpers/visualizer-harness";
+import { resolveVisualizerFixturePath, startVisualizerHarness } from "./helpers/visualizer-harness";
 
 test("shell loads all routes and keeps the read-only banner visible", async ({ page }) => {
   const harness = await startVisualizerHarness();
@@ -19,6 +19,7 @@ test("shell loads all routes and keeps the read-only banner visible", async ({ p
 
     for (const routeLabel of [
       "总览",
+      "请求监视 Requests Monitor",
       "场景图谱 Scene Map",
       "记忆浏览 Memory Explorer",
       "证据下钻 Evidence Drill-down",
@@ -61,5 +62,5 @@ test("shell shows missing-data warnings without losing navigation", async ({ pag
 });
 
 function harnesslessFixtureRoot(): string {
-  return path.resolve("apps/memory-visualizer/fixtures/complete-data-dir");
+  return resolveVisualizerFixturePath("complete-data-dir");
 }

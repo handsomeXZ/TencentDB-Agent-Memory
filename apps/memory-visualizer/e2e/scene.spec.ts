@@ -2,7 +2,7 @@ import path from "node:path";
 
 import { expect, test } from "@playwright/test";
 
-import { startVisualizerHarness } from "./helpers/visualizer-harness";
+import { resolveVisualizerFixturePath, startVisualizerHarness } from "./helpers/visualizer-harness";
 
 test("scene map renders summaries, heat, and updated metadata", async ({ page }) => {
   const harness = await startVisualizerHarness();
@@ -25,7 +25,7 @@ test("scene map renders summaries, heat, and updated metadata", async ({ page })
 });
 
 test("scene views degrade gracefully when persona is missing", async ({ page }) => {
-  const fixtureRoot = path.resolve("apps/memory-visualizer/fixtures/missing-persona");
+  const fixtureRoot = resolveVisualizerFixturePath("missing-persona");
   const harness = await startVisualizerHarness({
     dataDir: fixtureRoot,
     offloadRootPath: path.join(fixtureRoot, "offload"),
