@@ -9,6 +9,7 @@ import { App } from "./App";
 import type { DashboardSnapshot } from "../contracts/dashboard";
 import { DashboardApiError, type DashboardApiClient, type EvidenceLinkIndexEntry, type OffloadResponse } from "./api-client";
 import type { DashboardPage } from "../providers";
+import type { RequestTelemetryPage, RequestTelemetrySummary } from "../../../../src/telemetry/request-telemetry.js";
 
 describe("ui-shell App", () => {
   let container: HTMLDivElement;
@@ -37,6 +38,10 @@ describe("ui-shell App", () => {
     expect(textContent()).toContain("只读模式");
     expect(textContent()).toContain("总览");
 
+    await clickNav("请求监视 Requests Monitor");
+    expect(textContent()).toContain("紧凑请求表");
+    expect(textContent()).toContain("只读模式");
+
     await clickNav("场景图谱 Scene Map");
     expect(textContent()).toContain("Contract design");
     expect(textContent()).toContain("只读模式");
@@ -56,6 +61,31 @@ describe("ui-shell App", () => {
     await clickNav("设置 / 状态");
     expect(textContent()).toContain("路径配置");
     expect(textContent()).toContain("仅选择本地只读数据源");
+  });
+
+  it("renders grouped navigation and preserves source query parameters in nav hrefs and route changes", async () => {
+    window.history.replaceState({}, "", "/?sourceLabel=gateway-fixture&dataDir=D:/fixture-data");
+
+    await renderApp(createClient(createSnapshot(), false));
+
+    expect(textContent()).toContain("Overview");
+    expect(textContent()).toContain("Observability");
+    expect(textContent()).toContain("Explore");
+    expect(textContent()).toContain("Trace");
+    expect(textContent()).toContain("Debug");
+    expect(textContent()).toContain("System");
+    expect(textContent()).toContain("Requests Monitor");
+
+    expect(getNavHref("请求监视 Requests Monitor")).toBe("/requests-monitor?dataDir=D%3A%2Ffixture-data&sourceLabel=gateway-fixture");
+    expect(getNavHref("场景图谱 Scene Map")).toBe("/scene-map?dataDir=D%3A%2Ffixture-data&sourceLabel=gateway-fixture");
+    expect(getNavHref("设置 / 状态")).toBe("/settings-status?dataDir=D%3A%2Ffixture-data&sourceLabel=gateway-fixture");
+
+    await clickNav("场景图谱 Scene Map");
+
+    expect(window.location.pathname).toBe("/scene-map");
+    expect(new URLSearchParams(window.location.search).get("sourceLabel")).toBe("gateway-fixture");
+    expect(new URLSearchParams(window.location.search).get("dataDir")).toBe("D:/fixture-data");
+    expect(textContent()).toContain("Contract design");
   });
 
   it("renders ui-shell degraded empty states when the source is missing", async () => {
@@ -177,6 +207,12 @@ describe("ui-shell App", () => {
   function textContent(): string {
     return container.textContent ?? "";
   }
+
+  function getNavHref(label: string): string {
+    const link = [...container.querySelectorAll("a")].find((element) => element.textContent?.includes(label));
+    if (!(link instanceof HTMLAnchorElement)) throw new Error(`Navigation link not found: ${label}`);
+    return link.getAttribute("href") ?? "";
+  }
 });
 
 function createClient(snapshot: DashboardSnapshot, missingData: boolean): DashboardApiClient {
@@ -226,6 +262,8 @@ function createClient(snapshot: DashboardSnapshot, missingData: boolean): Dashbo
       limit: 50,
     },
   };
+  const requests = createEmptyRequestPage();
+  const requestsSummary = createEmptyRequestSummary();
 
   return {
     getSnapshot: async () => snapshot,
@@ -234,6 +272,8 @@ function createClient(snapshot: DashboardSnapshot, missingData: boolean): Dashbo
     getEvidence: async () => evidenceLinks,
     getConversations: async () => conversations,
     getOffload: async () => offload,
+    getRequests: async () => requests,
+    getRequestsSummary: async () => requestsSummary,
     getGatewayHealth: async () => ({ ok: false, endpoint: "/health", checkedAt: "2026-05-30T12:00:00.000Z", latencyMs: null, httpStatus: null, data: null, warning: "Gateway base URL is not configured." }),
     runGatewayRecallDebug: async () => ({ ok: false, endpoint: "/recall", checkedAt: "2026-05-30T12:00:00.000Z", latencyMs: null, httpStatus: null, data: null, warning: "Gateway base URL is not configured." }),
     runGatewayMemorySearchDebug: async () => ({ ok: false, endpoint: "/search/memories", checkedAt: "2026-05-30T12:00:00.000Z", latencyMs: null, httpStatus: null, data: null, warning: "Gateway base URL is not configured." }),
@@ -273,6 +313,14 @@ function createAuthAwareClientFactory(snapshot: DashboardSnapshot, secret: strin
         assertKey();
         return delegate.getOffload(config);
       },
+      getRequests: async (config, page) => {
+        assertKey();
+        return delegate.getRequests(config, page);
+      },
+      getRequestsSummary: async (config) => {
+        assertKey();
+        return delegate.getRequestsSummary(config);
+      },
       getGatewayHealth: async (config) => {
         assertKey();
         return delegate.getGatewayHealth(config);
@@ -306,6 +354,8 @@ function createAuthConfigurationErrorClientFactory(): (getApiKey: () => string |
       getEvidence: reject,
       getConversations: reject,
       getOffload: reject,
+      getRequests: reject,
+      getRequestsSummary: reject,
       getGatewayHealth: reject,
       runGatewayRecallDebug: reject,
       runGatewayMemorySearchDebug: reject,
@@ -483,4 +533,27 @@ async function flush() {
   await act(async () => {
     await Promise.resolve();
   });
+}
+
+function createEmptyRequestPage(): RequestTelemetryPage {
+  return {
+    items: [],
+    total: 0,
+    offset: 0,
+    limit: 20,
+    warnings: [],
+  };
+}
+
+function createEmptyRequestSummary(): RequestTelemetrySummary {
+  return {
+    generatedAt: "2026-05-30T12:00:00.000Z",
+    total: 0,
+    last24h: 0,
+    errorRate: 0,
+    p95LatencyMs: null,
+    recent5xx: [],
+    sources: [],
+    warnings: [],
+  };
 }

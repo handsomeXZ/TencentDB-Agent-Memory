@@ -9,6 +9,7 @@ import { App } from "./App";
 import type { DashboardSnapshot, SceneBlockSummary } from "../contracts/dashboard";
 import type { DashboardPage } from "../providers";
 import type { DashboardApiClient, EvidenceLinkIndexEntry, OffloadResponse } from "./api-client";
+import type { RequestTelemetryPage, RequestTelemetrySummary } from "../../../../src/telemetry/request-telemetry.js";
 
 describe("scene routes", () => {
   let container: HTMLDivElement;
@@ -154,6 +155,8 @@ function createClient(snapshot: DashboardSnapshot): DashboardApiClient {
     getEvidence: async () => evidenceLinks,
     getConversations: async () => conversations,
     getOffload: async () => offload,
+    getRequests: async () => createEmptyRequestPage(),
+    getRequestsSummary: async () => createEmptyRequestSummary(),
     getGatewayHealth: async () => ({ ok: false, endpoint: "/health", checkedAt: "2026-05-30T12:00:00.000Z", latencyMs: null, httpStatus: null, data: null, warning: "Gateway base URL is not configured." }),
     runGatewayRecallDebug: async () => ({ ok: false, endpoint: "/recall", checkedAt: "2026-05-30T12:00:00.000Z", latencyMs: null, httpStatus: null, data: null, warning: "Gateway base URL is not configured." }),
     runGatewayMemorySearchDebug: async () => ({ ok: false, endpoint: "/search/memories", checkedAt: "2026-05-30T12:00:00.000Z", latencyMs: null, httpStatus: null, data: null, warning: "Gateway base URL is not configured." }),
@@ -350,6 +353,29 @@ function createScenes(missingPersona = false): readonly SceneBlockSummary[] {
       rawMetadata: null,
     },
   ];
+}
+
+function createEmptyRequestPage(): RequestTelemetryPage {
+  return {
+    items: [],
+    total: 0,
+    offset: 0,
+    limit: 20,
+    warnings: [],
+  };
+}
+
+function createEmptyRequestSummary(): RequestTelemetrySummary {
+  return {
+    generatedAt: "2026-05-30T12:00:00.000Z",
+    total: 0,
+    last24h: 0,
+    errorRate: 0,
+    p95LatencyMs: null,
+    recent5xx: [],
+    sources: [],
+    warnings: [],
+  };
 }
 
 async function flush() {

@@ -16,6 +16,7 @@ import { App } from "./App";
 import type { DashboardSnapshot } from "../contracts/dashboard";
 import type { DashboardPage } from "../providers";
 import type { DashboardApiClient, OffloadResponse } from "./api-client";
+import type { RequestTelemetryPage, RequestTelemetrySummary } from "../../../../src/telemetry/request-telemetry.js";
 
 describe("offload and gateway debug views", () => {
   let container: HTMLDivElement;
@@ -160,6 +161,8 @@ function createClient(): DashboardApiClient & {
     getEvidence: async () => createPage([]),
     getConversations: async () => createPage(snapshot.conversationEvidence),
     getOffload: async () => offload,
+    getRequests: async () => createEmptyRequestPage(),
+    getRequestsSummary: async () => createEmptyRequestSummary(),
     getGatewayHealth: async () => ({
       ok: true,
       endpoint: "/health",
@@ -241,4 +244,27 @@ async function flush() {
   await act(async () => {
     await Promise.resolve();
   });
+}
+
+function createEmptyRequestPage(): RequestTelemetryPage {
+  return {
+    items: [],
+    total: 0,
+    offset: 0,
+    limit: 20,
+    warnings: [],
+  };
+}
+
+function createEmptyRequestSummary(): RequestTelemetrySummary {
+  return {
+    generatedAt: "2026-05-30T12:00:00.000Z",
+    total: 0,
+    last24h: 0,
+    errorRate: 0,
+    p95LatencyMs: null,
+    recent5xx: [],
+    sources: [],
+    warnings: [],
+  };
 }
