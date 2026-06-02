@@ -1,0 +1,29 @@
+Task 9 Gateway /visualizer/requests protected endpoint evidence
+Timestamp: 2026-06-02T09:55:08.3162377+08:00
+
+Files changed:
+- src/gateway/server.ts
+- src/gateway/server.test.ts
+
+Implemented:
+- Added protected GET /visualizer/requests.
+- Added protected GET /visualizer/requests/summary.
+- Reused shared telemetry store readers for merged gateway + visualizer JSONL reads.
+- Resolved one telemetry directory on the Gateway side, then merged request-logs.gateway.jsonl and request-logs.visualizer.jsonl from that directory.
+- Preserved fail-closed behavior when TDAI_GATEWAY_API_KEY is not configured.
+- Preserved request telemetry skip behavior for /visualizer/requests and /visualizer/requests/summary.
+
+Verification summary:
+- LSP diagnostics: clean for src/gateway/server.ts and src/gateway/server.test.ts.
+- Targeted test: npx vitest run src/gateway/server.test.ts
+  Result: 1 file passed, 10 tests passed.
+- Full test suite: npm test
+  Result: 11 files passed, 103 tests passed.
+
+Behavior covered by tests:
+- Missing configured API key returns 503 for /visualizer/requests and /visualizer/requests/summary.
+- Missing Bearer token returns 401 when Gateway API key is configured.
+- Valid Bearer auth returns DTO page and summary.
+- Gateway and Visualizer records are merged newest-first before offset/limit are applied.
+- Summary includes merged source buckets and recent 5xx entries.
+- Warning-bearing DTO responses preserve warning codes/messages/source labels while redacting all warning detail payloads to `null`.

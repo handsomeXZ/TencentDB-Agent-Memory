@@ -17,7 +17,7 @@
 import http from "node:http";
 import path from "node:path";
 import { URL } from "node:url";
-import { timingSafeEqual } from "node:crypto";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 import { LocalDashboardDataProvider } from "../visualizer/providers/local-dashboard-data-provider.js";
 import { TdaiCore } from "../core/tdai-core.js";
 import { StandaloneHostAdapter } from "../adapters/standalone/host-adapter.js";
@@ -46,6 +46,21 @@ import type { DashboardPage, LocalDashboardRequestConfig } from "../visualizer/p
 import { validateAndNormalizeRaw, fillTimestamps, SeedValidationError } from "../core/seed/input.js";
 import { executeSeed } from "../core/seed/seed-runtime.js";
 import type { SeedProgress } from "../core/seed/types.js";
+import { REQUEST_TELEMETRY_QUERY_KEY_ALLOWLIST, createSanitizedRequestLog } from "../telemetry/request-telemetry.js";
+import {
+  appendRequestTelemetryLog,
+  readRequestTelemetryPage,
+  readRequestTelemetrySummary,
+  resolveRequestTelemetryDirectory,
+  validateTelemetryPagination,
+} from "../telemetry/request-telemetry-store.js";
+import type {
+  RequestTelemetryAuthType,
+  RequestTelemetryPage,
+  RequestTelemetrySummary,
+  RequestTelemetryWarning,
+  SanitizedRequestLog,
+} from "../telemetry/request-telemetry.js";
 
 const TAG = "[tdai-gateway]";
 const VERSION = "0.1.0";
@@ -241,17 +256,18 @@ export class TdaiGateway {
     const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
     const method = req.method?.toUpperCase() ?? "GET";
     const pathname = url.pathname;
+    const telemetryStartedAt = Date.now();
 
     // Apply CORS headers based on configured allow-list (empty → no headers).
     this.applyCorsHeaders(req, res);
 
-    if (method === "OPTIONS") {
-      res.writeHead(204);
-      res.end();
-      return;
-    }
-
     try {
+      if (method === "OPTIONS") {
+        res.writeHead(204);
+        res.end();
+        return;
+      }
+
       // GET /health is always reachable without auth — operators and
       // orchestrators (k8s liveness, docker health-check) rely on it being
       // an unconditionally cheap probe.
@@ -297,6 +313,10 @@ export class TdaiGateway {
           return await this.handleVisualizerOffload(url, res);
         case "GET /visualizer/evidence":
           return await this.handleVisualizerEvidence(url, res);
+        case "GET /visualizer/requests":
+          return await this.handleVisualizerRequests(url, res);
+        case "GET /visualizer/requests/summary":
+          return await this.handleVisualizerRequestsSummary(res);
         default:
           sendError(res, 404, `Not found: ${method} ${pathname}`);
       }
@@ -304,6 +324,52 @@ export class TdaiGateway {
       const msg = err instanceof Error ? err.message : String(err);
       this.logger.error(`Request error [${method} ${pathname}]: ${msg}`);
       sendError(res, 500, msg);
+    } finally {
+      await this.recordRequestTelemetry({ method, pathname, url, statusCode: res.statusCode, startedAt: telemetryStartedAt });
+    }
+  }
+
+  private async recordRequestTelemetry(input: {
+    readonly method: string;
+    readonly pathname: string;
+    readonly url: URL;
+    readonly statusCode: number;
+    readonly startedAt: number;
+  }): Promise<void> {
+    const log = createSanitizedRequestLog({
+      id: `request:${randomUUID()}`,
+      source: "gateway",
+      method: input.method,
+      path: input.pathname,
+      query: gatewayTelemetryQueryKeys(input.url),
+      statusCode: input.statusCode,
+      latencyMs: Date.now() - input.startedAt,
+      authType: this.gatewayTelemetryAuthType(),
+      createdAt: new Date().toISOString(),
+    });
+    if (!log) return;
+
+    try {
+      const result = await appendRequestTelemetryLog(log, {
+        source: "gateway",
+        env: process.env,
+        unsafeRootDirs: [this.config.data.baseDir],
+      });
+      this.logTelemetryWarnings(result.warnings, log);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Request telemetry append failed open: ${message}`);
+    }
+  }
+
+  private gatewayTelemetryAuthType(): RequestTelemetryAuthType {
+    return this.config.server.apiKey ? "gateway_api_key" : "none";
+  }
+
+  private logTelemetryWarnings(warnings: readonly { readonly code: string }[], log: SanitizedRequestLog): void {
+    for (const warning of warnings) {
+      if (warning.code === "telemetry-dir-unconfigured") continue;
+      this.logger.warn(`Request telemetry warning [${log.method} ${log.path}]: ${warning.code}`);
     }
   }
 
@@ -526,6 +592,69 @@ export class TdaiGateway {
     sendJson(res, 200, await provider.getEvidenceLinkIndex(this.createVisualizerRequestConfig(url)));
   }
 
+  private async handleVisualizerRequests(url: URL, res: http.ServerResponse): Promise<void> {
+    const telemetryRead = this.resolveGatewayTelemetryRead();
+    const pagination = validateTelemetryPagination(url.searchParams.get("limit"), url.searchParams.get("offset"));
+    if (!pagination.ok) {
+      sendError(res, 400, pagination.error.message);
+      return;
+    }
+    if (!telemetryRead.ok) {
+      sendJson(res, 200, sanitizeTelemetryPage({
+        items: [],
+        total: 0,
+        offset: pagination.offset,
+        limit: pagination.limit,
+        warnings: [...pagination.warnings, ...telemetryRead.warnings],
+      }));
+      return;
+    }
+    const result = await readRequestTelemetryPage({
+      telemetryDir: telemetryRead.telemetryDir,
+      unsafeRootDirs: [this.config.data.baseDir],
+      limit: url.searchParams.get("limit"),
+      offset: url.searchParams.get("offset"),
+    });
+    if (!result.ok) {
+      sendError(res, 400, result.error.message);
+      return;
+    }
+    sendJson(res, 200, sanitizeTelemetryPage(result.page));
+  }
+
+  private async handleVisualizerRequestsSummary(res: http.ServerResponse): Promise<void> {
+    const telemetryRead = this.resolveGatewayTelemetryRead();
+    if (!telemetryRead.ok) {
+      sendJson(res, 200, sanitizeTelemetrySummary({
+        generatedAt: new Date().toISOString(),
+        total: 0,
+        last24h: 0,
+        errorRate: 0,
+        p95LatencyMs: null,
+        recent5xx: [],
+        sources: [],
+        warnings: telemetryRead.warnings,
+      }));
+      return;
+    }
+    sendJson(res, 200, sanitizeTelemetrySummary(await readRequestTelemetrySummary({
+      telemetryDir: telemetryRead.telemetryDir,
+      unsafeRootDirs: [this.config.data.baseDir],
+    })));
+  }
+
+  private resolveGatewayTelemetryRead():
+    | { readonly ok: true; readonly telemetryDir: string }
+    | { readonly ok: false; readonly warnings: readonly RequestTelemetryWarning[] } {
+    const resolution = resolveRequestTelemetryDirectory({
+      source: "gateway",
+      env: process.env,
+      unsafeRootDirs: [this.config.data.baseDir],
+    });
+    if (!resolution.ok || !resolution.dir) return { ok: false, warnings: resolution.warnings };
+    return { ok: true, telemetryDir: resolution.dir };
+  }
+
   private createVisualizerProvider(): LocalDashboardDataProvider {
     return new LocalDashboardDataProvider({
       appConfig: {
@@ -686,6 +815,37 @@ function readOptionalTextParam(url: URL, key: string): string | undefined {
   if (raw === null) return undefined;
   const value = raw.trim();
   return value.length > 0 ? value : undefined;
+}
+
+function gatewayTelemetryQueryKeys(url: URL): URLSearchParams {
+  const query = new URLSearchParams();
+  for (const key of REQUEST_TELEMETRY_QUERY_KEY_ALLOWLIST) {
+    if (url.searchParams.has(key)) query.set(key, "");
+  }
+  return query;
+}
+
+function sanitizeTelemetryPage(page: RequestTelemetryPage): RequestTelemetryPage {
+  return {
+    ...page,
+    warnings: sanitizeTelemetryWarnings(page.warnings),
+  };
+}
+
+function sanitizeTelemetrySummary(summary: RequestTelemetrySummary): RequestTelemetrySummary {
+  return {
+    ...summary,
+    warnings: sanitizeTelemetryWarnings(summary.warnings),
+  };
+}
+
+function sanitizeTelemetryWarnings(warnings: readonly RequestTelemetryWarning[]): readonly RequestTelemetryWarning[] {
+  return warnings.map((warning) => ({
+    code: warning.code,
+    message: warning.message,
+    source: warning.source,
+    detail: null,
+  }));
 }
 
 // ============================

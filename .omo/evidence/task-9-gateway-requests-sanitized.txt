@@ -1,0 +1,23 @@
+Task 9 Gateway /visualizer/requests sanitization evidence
+Timestamp: 2026-06-02T09:55:08.3162377+08:00
+
+Sanitization checks implemented in tests:
+- Invalid limit returns HTTP 400 with only: "Telemetry limit must be a non-negative integer."
+- Invalid offset returns HTTP 400 with only: "Telemetry offset must be a non-negative integer."
+- Test asserts the serialized 400 bodies do not contain a detail object.
+- Test seeds unsafe extra JSONL fields and verifies returned DTOs do not expose them.
+- Gateway now redacts all request telemetry warnings before returning DTOs: clients receive only `code`, `message`, `source`, and `detail: null`.
+- Regression coverage now includes capped-limit, missing-file, oversized-file, corrupt-line, and unsafe-directory warning cases.
+
+Seeded unsafe input fields (test-only fixture data):
+- extra query/body/header/response/memory/local-path fields were added to raw JSONL lines.
+
+Observed returned DTO contract:
+- Returned page items include only sanitized request log fields.
+- Returned summary includes aggregate metrics and sanitized recent5xx items.
+- No raw query values, request bodies, headers, secrets, memory content, or local filesystem paths are returned.
+- No warning detail payload exposes absolute temp directories, protected-root metadata, or internal path-detail keys.
+
+Post-write evidence scan result:
+- The two Task 9 evidence files were scanned for seeded secret placeholders and local-path markers.
+- Result: no matches after removing the scan pattern example from this evidence file.
